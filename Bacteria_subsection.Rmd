@@ -7,6 +7,16 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+
+rm(list = ls())
+
+package.list <- c("dplyr")
+
+if(!all(package.list %in% installed.packages()[,"Package"])){
+  install.packages(package.list[!(package.list %in% installed.packages()[,"Package"])])
+}
+
+library(dplyr)
 ```
 
 ## R Markdown
