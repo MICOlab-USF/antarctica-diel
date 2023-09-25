@@ -19,17 +19,11 @@ if(!all(package.list %in% installed.packages()[,"Package"])){
 library(dplyr)
 library(tidyr)
 
-# full.tax <- read.csv("CSV_files/full_taxonomy.csv", sep = "\t")
-# 
-# bact.tax <- full.tax[separate(full.tax,col = full_classification,into = "Domain", ";")$Domain == "Bacteria",]
-# 
-# full.func <- read.csv("CSV_files/full_function.csv", sep = "\t")
-# 
-# bact.func <- full.func[separate(full.func,col = full_classification,into = "Domain", ";")$Domain == "Bacteria",]
-
 tax.func <- read.csv("CSV_files/TaxonomicAndFunctionalAnnotations.csv", sep = "\t")
 
-bacteria <- tax.func[separate(tax.func,col = full_classification,into = "Domain", ";")$Domain == "Bacteria",]
+tax.func <- separate(tax.func,col = full_classification,into = c("Domain","Supergroup","Division","Class","Order","Family","Genus","Species"), sep = ";", remove = FALSE)
+
+bacteria <- tax.func[tax.func$Domain == "Bacteria",]
 
 salmon.numread <- read.csv("CSV_files/salmon.merged.numreads.subset5.csv")
 
