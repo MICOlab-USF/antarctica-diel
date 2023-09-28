@@ -10,7 +10,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 rm(list = ls())
 
-package.list <- c("dplyr","tidyr")
+package.list <- c("dplyr","tidyr","ggplot2")
 
 if(!all(package.list %in% installed.packages()[,"Package"])){
   install.packages(package.list[!(package.list %in% installed.packages()[,"Package"])])
@@ -18,20 +18,50 @@ if(!all(package.list %in% installed.packages()[,"Package"])){
 
 library(dplyr)
 library(tidyr)
+library(ggplot2)
 
-tax.func <- read.csv("CSV_files/TaxonomicAndFunctionalAnnotations.csv", sep = "\t")
+# tax.func <- read.csv("CSV_files/TaxonomicAndFunctionalAnnotations.csv", sep = "\t")
+# 
+# tax.func <- separate(tax.func,col = full_classification,into = c("Domain","Supergroup","Division","Class","Order","Family","Genus","Species"), sep = ";", remove = FALSE)
+# 
+# bacteria <- tax.func[tax.func$Domain == "Bacteria",]
+# write.csv(bacteria,"CSV_files/Bacteria.subsection.TFA.csv", row.names = F)
+# 
+# salmon.numread <- read.csv("CSV_files/salmon.merged.numreads.subset5.csv")
+# 
+# salmon.TPM <- read.csv("CSV_files/salmon.merged.TPM.subset5.csv")
+# 
+# TPM.short <- salmon.TPM[1:100,]
+# write.csv(TPM.short,"CSV_files/Salmon.merged.TPM.short.csv", row.names = F)
+# 
+# numr.short <- salmon.numread[1:100,]
+# write.csv(numr.short,"CSV_files/Salmon.merged.numreads.short.csv", row.names = F)
 
-tax.func <- separate(tax.func,col = full_classification,into = c("Domain","Supergroup","Division","Class","Order","Family","Genus","Species"), sep = ";", remove = FALSE)
+meta.data <- read.csv("CSV_files/dielRNA_eukrythmic.tsv", sep = "\t")
 
-bacteria <- tax.func[tax.func$Domain == "Bacteria",]
+bacteria <- read.csv("CSV_files/bacteria.subsection.TFA.csv")
 
-salmon.numread <- read.csv("CSV_files/salmon.merged.numreads.subset5.csv")
+```
 
-numr.short <- salmon.numread[1:100,]
 
-salmon.TPM <- read.csv("CSV_files/salmon.merged.TPM.subset5.csv")
+```{r Bacteria data}
 
-TPM.short <- salmon.TPM[1:100,]
+dfOut <- bacteria
+
+# Count the frequency of each class
+class_counts <- dfOut %>%
+  count(Class)
+
+# Create a bar plot
+ggplot(dfOut, aes(x = Class))+
+  geom_bar()+
+  scale_y_log10()+
+  labs(title = "Class Distribution",
+       x = "Class",
+       y = "Count")+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+
 ```
 
 
