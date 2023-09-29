@@ -1,5 +1,5 @@
 ---
-title: "Test"
+title: "Bacteria Subsection and plotting"
 author: "Andreas Norlin"
 date: "2023-09-12"
 output: html_document
@@ -20,37 +20,113 @@ library(dplyr)
 library(tidyr)
 library(ggplot2)
 
+#Subsectioning the bacteria data from the Taxonomic and Functional Annotations file####
+
 # tax.func <- read.csv("CSV_files/TaxonomicAndFunctionalAnnotations.csv", sep = "\t")
 # 
 # tax.func <- separate(tax.func,col = full_classification,into = c("Domain","Supergroup","Division","Class","Order","Family","Genus","Species"), sep = ";", remove = FALSE)
 # 
 # bacteria <- tax.func[tax.func$Domain == "Bacteria",]
+# 
+# for(i in 1:nrow(bacteria)){
+#   n.char <- nchar(bacteria$transcript_name[i])
+#   
+#   if(substring(bacteria$transcript_name[i], n.char-2, n.char-2) == "."){
+#     bacteria$SequenceID[i] <- substring(bacteria$transcript_name[i],1,n.char-3)
+#     
+#   } else if(substring(bacteria$transcript_name[i], n.char-3, n.char-3) == "."){
+#     bacteria$SequenceID[i] <- substring(bacteria$transcript_name[i],1,n.char-4)
+#     
+#   }
+# }
 # write.csv(bacteria,"CSV_files/Bacteria.subsection.TFA.csv", row.names = F)
+
+#Using the sequence ID's from the bacteria subsection to subsection the numreads and the TPM files####
+
+# Bacteria <- read.csv("CSV_files/bacteria.subsection.TFA.csv")
 # 
 # salmon.numread <- read.csv("CSV_files/salmon.merged.numreads.subset5.csv")
+# filter <- salmon.numread$Name %in% bacteria$SequenceID
+# 
+# Bacteria.numread <- salmon.numread[filter,]
+# write.csv(Bacteria.numread,"CSV_files/Bacteria.subsection.numreads.csv",row.names = F)
 # 
 # salmon.TPM <- read.csv("CSV_files/salmon.merged.TPM.subset5.csv")
 # 
-# TPM.short <- salmon.TPM[1:100,]
-# write.csv(TPM.short,"CSV_files/Salmon.merged.TPM.short.csv", row.names = F)
-# 
-# numr.short <- salmon.numread[1:100,]
-# write.csv(numr.short,"CSV_files/Salmon.merged.numreads.short.csv", row.names = F)
+# Bacteria.TPM <- salmon.TPM[filter,]
+# write.csv(Bacteria.TPM, "CSV_files/Bacteria.subsection.TPM.csv",row.names = F)
+
+#Reading the Bacteria numread and TPM subsectioned files.####
 
 meta.data <- read.csv("CSV_files/dielRNA_eukrythmic.tsv", sep = "\t")
 
-bacteria <- read.csv("CSV_files/bacteria.subsection.TFA.csv")
+Bacteria.numread <- read.csv("CSV_files/Bacteria.subsection.numreads.csv")
+Bacteria.TPM <- read.csv("CSV_files/Bacteria.subsection.TPM.csv")
 
+# Bacteria.TFA <- read.csv("CSV_files/bacteria.subsection.TFA.csv")
+# #Filtering out the sequences present in the Taxonomy and functional annotations data, but not in the numread/TPM
+# filter <- Bacteria.TFA$SequenceID %in% Bacteria.numread$Name 
+# 
+# Bacteria.TFA <- Bacteria.TFA[filter,]
+```
+
+```{r Data cleaning}
+# unique.vec <- unique(Bacteria.TFA$SequenceID)
+# 
+# for(i in 1:length(unique.vec)){
+#   if(i == 1){
+#     Time1 <- Sys.time()
+#     Time2 <- Sys.time()
+# 
+#     n <- 1
+#     df <- data.frame(matrix(ncol = ncol(Bacteria.TFA), nrow = length(unique.vec)))
+#     names(df) <- names(Bacteria.TFA)
+#   }
+# 
+#   vec <- Bacteria.TFA[Bacteria.TFA$SequenceID == unique.vec[i],]
+# 
+#   if(nrow(vec) == 1){
+#     df[n,] <- vec
+# 
+#     n <- n+1
+# 
+#   } else {
+#     filter <- vec$KEGG_ko == "-"
+# 
+#     if(sum(filter) == 1){
+# 
+#       df[n,] <- vec[filter,]
+# 
+#       n <- n+1
+#     } else {
+#       df[n,] <- vec[1,]
+# 
+#       n <- n+1
+#     }
+#   }
+# 
+#   if(i %% 5000 == 0){
+#     print(paste("i = ", i , " out of ", length(unique.vec),sep = ""))
+# 
+#     print(paste("time since start: ", round(Sys.time() - Time1,1)," minutes", sep = ""))
+#     print(paste("Time since last: ", round(Sys.time() - Time2,1)," minutes", sep = ""))
+# 
+#     Time2 <- Sys.time()
+#   }
+# 
+#   if(i == length(unique.vec)){
+#     df <- df[!is.na(df$X),]
+#   }
+# }
+# 
+# write.csv(df,"CSV_files/Bacteria.TFA_NoRep.csv",row.names = F)
 ```
 
 
 ```{r Bacteria data}
+Bacteria.TFA <- read.csv("CSV_files/Bacteria.TFA_NoRep.csv")
 
-dfOut <- bacteria
-
-# Count the frequency of each class
-class_counts <- dfOut %>%
-  count(Class)
+dfOut <- Bacteria.TFA
 
 # Create a bar plot
 ggplot(dfOut, aes(x = Class))+
