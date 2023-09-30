@@ -30,13 +30,13 @@ library(ggplot2)
 # 
 # for(i in 1:nrow(bacteria)){
 #   n.char <- nchar(bacteria$transcript_name[i])
-#   
+# 
 #   if(substring(bacteria$transcript_name[i], n.char-2, n.char-2) == "."){
 #     bacteria$SequenceID[i] <- substring(bacteria$transcript_name[i],1,n.char-3)
-#     
+# 
 #   } else if(substring(bacteria$transcript_name[i], n.char-3, n.char-3) == "."){
 #     bacteria$SequenceID[i] <- substring(bacteria$transcript_name[i],1,n.char-4)
-#     
+# 
 #   }
 # }
 # write.csv(bacteria,"CSV_files/Bacteria.subsection.TFA.csv", row.names = F)
@@ -65,7 +65,7 @@ Bacteria.TPM <- read.csv("CSV_files/Bacteria.subsection.TPM.csv")
 
 # Bacteria.TFA <- read.csv("CSV_files/bacteria.subsection.TFA.csv")
 # #Filtering out the sequences present in the Taxonomy and functional annotations data, but not in the numread/TPM
-# filter <- Bacteria.TFA$SequenceID %in% Bacteria.numread$Name 
+# filter <- Bacteria.TFA$SequenceID %in% Bacteria.numread$Name
 # 
 # Bacteria.TFA <- Bacteria.TFA[filter,]
 ```
