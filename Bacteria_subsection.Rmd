@@ -60,7 +60,10 @@ library(ggplot2)
 
 meta.data <- read.csv("CSV_files/dielRNA_eukrythmic.tsv", sep = "\t")
 
+#Raw read
 Bacteria.numread <- read.csv("CSV_files/Bacteria.subsection.numreads.csv")
+
+#Transcripts per million
 Bacteria.TPM <- read.csv("CSV_files/Bacteria.subsection.TPM.csv")
 
 # Bacteria.TFA <- read.csv("CSV_files/bacteria.subsection.TFA.csv")
@@ -125,10 +128,14 @@ Bacteria.TPM <- read.csv("CSV_files/Bacteria.subsection.TPM.csv")
 
 ```{r}
 Bacteria.TFA <- read.csv("CSV_files/Bacteria.TFA_NoRep.csv")
+Bacteria.TFA$Class <- ifelse(substring(Bacteria.TFA$Class,nchar(Bacteria.TFA$Class)-7) == " (Class)",
+                             substring(Bacteria.TFA$Class,1,nchar(Bacteria.TFA$Class)-8),
+                             Bacteria.TFA$Class)
 
 names(Bacteria.numread)[1] <- "SequenceID"
 
 df.merged <- merge(Bacteria.numread,Bacteria.TFA,by = "SequenceID")
+df.merged$Class <- substring(df.merged$Class,2)
 
 
 Class.vec <- unique(df.merged$Class)
@@ -139,9 +146,11 @@ m <- length(day.vec)
 
 for(i in 1:n){ #Looping through the Classes to count the occurrences.
   
+  df.NoNa <- df.merged[!is.na(df.merged$Class),]
+  
   if(!is.na(Class.vec[i])){
-    Class.filter <- df.merged$Class == Class.vec[i]
-    df.temp <- df.merged[Class.filter,]
+    Class.filter <- df.NoNa$Class == Class.vec[i]
+    df.temp <- df.NoNa[Class.filter,]
   } else {
     df.temp <- df.merged[is.na(df.merged$Class),]
   }
@@ -155,9 +164,27 @@ for(i in 1:n){ #Looping through the Classes to count the occurrences.
      
      df.count <- cbind(df.count,Class.vec)
    }
+    
+    df.count[i,j] <- sum(df.temp[,day.vec[j]])/sum(df.merged[,day.vec[j]])
+    
   }
 }
+```
 
+```{r}
+dfOut <- pivot_longer(df.count,
+                      all_of(meta.data$SampleName),
+                      names_to = "Day",
+                      values_to = "Count")
+
+p1 <- ggplot(dfOut)+
+  geom_bar(aes(fill = Class.vec,
+               y = Count,
+               x = Day),
+           position = "stack", stat = "identity")+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+p1
 ```
 
 
