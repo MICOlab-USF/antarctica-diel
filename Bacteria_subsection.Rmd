@@ -123,6 +123,44 @@ Bacteria.TPM <- read.csv("CSV_files/Bacteria.subsection.TPM.csv")
 ```
 
 
+```{r}
+Bacteria.TFA <- read.csv("CSV_files/Bacteria.TFA_NoRep.csv")
+
+names(Bacteria.numread)[1] <- "SequenceID"
+
+df.merged <- merge(Bacteria.numread,Bacteria.TFA,by = "SequenceID")
+
+
+Class.vec <- unique(df.merged$Class)
+n <- length(Class.vec)
+
+day.vec <- paste(meta.data$SampleID,"_quant",sep = "")
+m <- length(day.vec)
+
+for(i in 1:n){ #Looping through the Classes to count the occurrences.
+  
+  if(!is.na(Class.vec[i])){
+    Class.filter <- df.merged$Class == Class.vec[i]
+    df.temp <- df.merged[Class.filter,]
+  } else {
+    df.temp <- df.merged[is.na(df.merged$Class),]
+  }
+  
+  for(j in 1:m){ #Looping through the sampling time points.
+    
+   if(i == 1 & j == 1){ #Sets up an empty data.frame to input the data
+     
+     df.count <- data.frame(matrix(ncol = m, nrow = n))
+     names(df.count) <- meta.data$SampleName
+     
+     df.count <- cbind(df.count,Class.vec)
+   }
+  }
+}
+
+```
+
+
 ```{r Bacteria data}
 Bacteria.TFA <- read.csv("CSV_files/Bacteria.TFA_NoRep.csv")
 
