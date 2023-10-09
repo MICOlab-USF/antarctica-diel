@@ -10,7 +10,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 rm(list = ls())
 
-package.list <- c("dplyr","tidyr","ggplot2")
+package.list <- c("dplyr","tidyr","ggplot2","lemon")
 
 if(!all(package.list %in% installed.packages()[,"Package"])){
   install.packages(package.list[!(package.list %in% installed.packages()[,"Package"])])
@@ -19,6 +19,7 @@ if(!all(package.list %in% installed.packages()[,"Package"])){
 library(dplyr)
 library(tidyr)
 library(ggplot2)
+library(lemon)
 
 #Subsectioning the bacteria data from the Taxonomic and Functional Annotations file####
 
@@ -172,19 +173,46 @@ for(i in 1:n){ #Looping through the Classes to count the occurrences.
 ```
 
 ```{r}
-dfOut <- pivot_longer(df.count,
+df.merged2 <- df.merged[df.merged$Class != "Unclassified",]
+
+top5.vec <- names(table(df.merged2$Class)[order(-table(df.merged2$Class))[1:5]])
+df.count$Class.vec[is.na(df.count$Class.vec)] <- "Unclassified"
+
+top5.filter <- df.count$Class.vec %in% c(top5.vec,"Unclassified")
+
+df.top5 <- df.count[top5.filter,]
+df.other <- df.count[!top5.filter,]
+
+df.count2 <- rbind(df.top5,c(colSums(df.other[,1:24]),"Other"))
+
+dfOut <- pivot_longer(df.count2,
                       all_of(meta.data$SampleName),
                       names_to = "Day",
                       values_to = "Count")
 
 p1 <- ggplot(dfOut)+
-  geom_bar(aes(fill = Class.vec,
-               y = Count,
+  geom_bar(aes(fill = factor(Class.vec,
+                             levels = c("Other","Unclassified",top5.vec)),
+               y = as.numeric(Count),
                x = Day),
            position = "stack", stat = "identity")+
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+  theme(axis.text.x = element_text(angle = 90,
+                                   vjust = 0.5,
+                                   hjust=1))+
+  guides(fill = guide_legend(title = "Class"))
 
 p1
+```
+
+```{r}
+
+for(i in 1:24){
+  if(i == 1){
+    vec <- rep(NA,24)
+  }
+  
+  vec[i] <- mean(df.NoNa[df.NoNa$Class == "Actinobacteria",i+1])
+}
 ```
 
 
