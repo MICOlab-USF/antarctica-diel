@@ -185,10 +185,14 @@ df.other <- df.count[!top5.filter,]
 
 df.count2 <- rbind(df.top5,c(colSums(df.other[,1:24]),"Other"))
 
+# order.vec <- c("Day1_morning1", "Day1_morning2", "Day1_morning3", "Day1_afternoon1", "Day1_afternoon2", "Day1_afternoon3", "Day1_evening1", "Day1_evening2", "Day1_evening3", "Day1_night1", "Day1_night2", "Day1_night3",
+#                "Day2_morning1", "Day2_morning2", "Day2_morning3", "Day2_afternoon1", "Day2_afternoon2", "Day2_afternoon3", "Day2_evening1", "Day2_evening2", "Day2_evening3", "Day2_night1", "Day2_night2", "Day2_night3")
+
 dfOut <- pivot_longer(df.count2,
                       all_of(meta.data$SampleName),
                       names_to = "Day",
-                      values_to = "Count")
+                      values_to = "Count")# %>% 
+  #mutate(Day, levels = order.vec)
 
 p1 <- ggplot(dfOut)+
   geom_bar(aes(fill = factor(Class.vec,
