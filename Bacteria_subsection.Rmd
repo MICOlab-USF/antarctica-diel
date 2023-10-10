@@ -138,6 +138,8 @@ names(Bacteria.numread)[1] <- "SequenceID"
 df.merged <- merge(Bacteria.numread,Bacteria.TFA,by = "SequenceID")
 df.merged$Class <- substring(df.merged$Class,2)
 
+df.merged$Class[is.na(df.merged$Class)] <- "Unclassified"
+
 
 Class.vec <- unique(df.merged$Class)
 n <- length(Class.vec)
@@ -147,14 +149,8 @@ m <- length(day.vec)
 
 for(i in 1:n){ #Looping through the Classes to count the occurrences.
   
-  df.NoNa <- df.merged[!is.na(df.merged$Class),]
-  
-  if(!is.na(Class.vec[i])){
-    Class.filter <- df.NoNa$Class == Class.vec[i]
-    df.temp <- df.NoNa[Class.filter,]
-  } else {
-    df.temp <- df.merged[is.na(df.merged$Class),]
-  }
+  Class.filter <- df.merged$Class == Class.vec[i]
+  df.temp <- df.merged[Class.filter,]
   
   for(j in 1:m){ #Looping through the sampling time points.
     
@@ -170,13 +166,10 @@ for(i in 1:n){ #Looping through the Classes to count the occurrences.
     
   }
 }
-```
 
-```{r}
 df.merged2 <- df.merged[df.merged$Class != "Unclassified",]
 
 top5.vec <- names(table(df.merged2$Class)[order(-table(df.merged2$Class))[1:5]])
-df.count$Class.vec[is.na(df.count$Class.vec)] <- "Unclassified"
 
 top5.filter <- df.count$Class.vec %in% c(top5.vec,"Unclassified")
 
@@ -197,8 +190,7 @@ order.vec <- c("Day1_morning1",   "Day1_morning2",   "Day1_morning3",
 dfOut <- pivot_longer(df.count2,
                       all_of(meta.data$SampleName),
                       names_to = "Day",
-                      values_to = "Count")# %>% 
-  #factor(Day, levels = order.vec)
+                      values_to = "Count")
 
 p1 <- ggplot(dfOut)+
   geom_bar(aes(fill = factor(Class.vec,
@@ -215,14 +207,92 @@ p1
 ```
 
 ```{r}
+Bacteria.TFA <- read.csv("CSV_files/Bacteria.TFA_NoRep.csv")
+Bacteria.TFA$Class <- ifelse(substring(Bacteria.TFA$Class,nchar(Bacteria.TFA$Class)-7) == " (Class)",
+                             substring(Bacteria.TFA$Class,1,nchar(Bacteria.TFA$Class)-8),
+                             Bacteria.TFA$Class)
 
-for(i in 1:24){
-  if(i == 1){
-    vec <- rep(NA,24)
-  }
+names(Bacteria.numread)[1] <- "SequenceID"
+
+df.merged <- merge(Bacteria.numread,Bacteria.TFA,by = "SequenceID")
+df.merged$Class <- substring(df.merged$Class,2)
+
+df.merged$Class[is.na(df.merged$Class)] <- "Unclassified"
+
+
+Class.vec <- unique(df.merged$Class)
+n <- length(Class.vec)
+
+day.vec <- paste(meta.data$SampleID,"_quant",sep = "")
+m <- length(day.vec)
+
+for(i in 1:n){ #Looping through the Classes to count the occurrences.
   
-  vec[i] <- mean(df.NoNa[df.NoNa$Class == "Actinobacteria",i+1])
+  Class.filter <- df.merged$Class == Class.vec[i]
+  df.temp <- df.merged[Class.filter,]
+  
+  for(j in 1:m){ #Looping through the sampling time points.
+    
+   if(i == 1 & j == 1){ #Sets up an empty data.frame to input the data
+     
+     df.count <- data.frame(matrix(ncol = m, nrow = n))
+     names(df.count) <- meta.data$SampleName
+     
+     df.count <- cbind(df.count,Class.vec)
+   }
+    
+    df.count[i,j] <- mean(df.temp[,day.vec[j]])
+    
+  }
 }
+
+order.vec <- c("Day1_morning1",   "Day1_morning2",   "Day1_morning3",
+               "Day1_afternoon1", "Day1_afternoon2", "Day1_afternoon3",
+               "Day1_evening1",   "Day1_evening2",   "Day1_evening3",
+               "Day1_night1",     "Day1_night2",     "Day1_night3",
+               "Day2_morning1",   "Day2_morning2",   "Day2_morning3",
+               "Day2_afternoon1", "Day2_afternoon2", "Day2_afternoon3",
+               "Day2_evening1",   "Day2_evening2",   "Day2_evening3",
+               "Day2_night1",     "Day2_night2",     "Day2_night3")
+
+dfOut <- pivot_longer(df.count,
+                      all_of(meta.data$SampleName),
+                      names_to = "Day",
+                      values_to = "Count")
+
+dfOut <- dfOut[dfOut$Class.vec == unique(dfOut$Class.vec)[1:2],]
+
+p2 <- ggplot(data = dfOut)+
+  geom_line(aes(x = factor(Day, level = order.vec),
+                y = Count,
+                group = 1,
+                color = Class.vec))+
+  theme(axis.text.x = element_text(angle = 90,
+                                   vjust = 0.5,
+                                   hjust=1))
+
+p2
+```
+
+
+```{r}
+Class.vec <- unique(df.merged$Class)
+
+for(j in 1:length(Class.vec)){
+  if(j == 1){
+    df.mean <- 0
+  }
+  for(i in 1:24){
+    
+    if(i == 1){
+      vec <- rep(NA,24)
+    }
+    
+    vec[i] <- mean(df.merged[df.merged$Class == "Actinobacteria",i+1])
+  }
+}
+
+
 ```
 
 
