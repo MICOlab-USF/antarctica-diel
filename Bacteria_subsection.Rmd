@@ -25,7 +25,7 @@ library(lemon)
 
 # tax.func <- read.csv("CSV_files/TaxonomicAndFunctionalAnnotations.csv", sep = "\t")
 # 
-# tax.func <- separate(tax.func,col = full_classification,into = c("Domain","Supergroup","Division","Class","Order","Family","Genus","Species"), sep = ";", remove = FALSE)
+# tax.func <- separate(tax.func,col = full_classification,into = c("Domain","Supergroup","Division","Class","Order","Family","Genus","Species"), sep = ";", remove = FALSE, fill = "right", extra = "drop")
 # 
 # bacteria <- tax.func[tax.func$Domain == "Bacteria",]
 # 
@@ -73,6 +73,9 @@ Bacteria.TPM <- read.csv("CSV_files/Bacteria.subsection.TPM.csv")
 # 
 # Bacteria.TFA <- Bacteria.TFA[filter,]
 ```
+
+Filter for kegg.ko then add the rest afterwards.
+Try to optimize the sorting
 
 ```{r Data cleaning}
 # unique.vec <- unique(Bacteria.TFA$SequenceID)
@@ -205,7 +208,13 @@ p1 <- ggplot(dfOut)+
 
 p1
 ```
+The 1, 2, and 3 are replicates, so they can be averaged and error bars added.
 
+Make som plots with meta-data
+
+make some plots with the cogs, split data and double count.
+
+Try to look at the KEGG data
 ```{r}
 Bacteria.TFA <- read.csv("CSV_files/Bacteria.TFA_NoRep.csv")
 Bacteria.TFA$Class <- ifelse(substring(Bacteria.TFA$Class,nchar(Bacteria.TFA$Class)-7) == " (Class)",
@@ -260,7 +269,7 @@ dfOut <- pivot_longer(df.count,
                       names_to = "Day",
                       values_to = "Count")
 
-dfOut <- dfOut[dfOut$Class.vec == unique(dfOut$Class.vec)[1:2],]
+dfOut <- dfOut[dfOut$Class.vec == unique(dfOut$Class.vec)[1],]
 
 p2 <- ggplot(data = dfOut)+
   geom_line(aes(x = factor(Day, level = order.vec),
