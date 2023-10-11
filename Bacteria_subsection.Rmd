@@ -10,7 +10,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 rm(list = ls())
 
-package.list <- c("dplyr","tidyr","ggplot2","lemon")
+package.list <- c("dplyr","tidyr","ggplot2","lemon","vegan")
 
 if(!all(package.list %in% installed.packages()[,"Package"])){
   install.packages(package.list[!(package.list %in% installed.packages()[,"Package"])])
@@ -20,6 +20,7 @@ library(dplyr)
 library(tidyr)
 library(ggplot2)
 library(lemon)
+library(vegan)
 
 #Subsectioning the bacteria data from the Taxonomic and Functional Annotations file####
 
