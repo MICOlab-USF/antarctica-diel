@@ -1,0 +1,255 @@
+---
+title: "Maggi's Analysis"
+author: "Maggi Brisbin"
+date: "2023-09-18"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Packages
+```{r load_packages, message=FALSE}
+library(phyloseq)
+library(lubridate)
+library(tidyverse)
+library(patchwork)
+library(vegan)
+library(DESeq2)
+
+`%ni%` = Negate(`%in%`)
+
+colors=c('#e9e9e9','#C14450','#f0b08f','#c2aba6','#60555f','#3c6481','#9fd6e6','#256F64','#63a375')
+
+red<- c("#EB8B8E","#FBD5E2","#E7B6AF","#AC6873", "#D82354")
+orange <- c("#FAAA6D","#FECF92")
+yellow <- c("#FFC317","#F7F4B7", "#CC9C3C")
+green <- c("#16866F","#1E3F1C","#99A339","#516A65","#8BC89F")
+blue <- c("#005694","#B7E1DD","#66879E","#1BAAE2","#5FC8D8")
+purple <- c("#E7D7CE","#A699A9","#434582","#81347D", "#B5218E")
+
+colors30 <- c(blue, purple, red, yellow, orange, green, "black")
+```
+
+
+```{r load_data}
+tpm <- read.csv("salmon.merged.TPM.subset5.csv") #transcripts per million
+names(tpm)[1] <- "SequenceID" #rename sequence ID column to match annotation files
+
+counts <- read.csv("salmon.merged.numreads.subset5.csv")
+names(counts)[1] <- "SequenceID"
+
+funtax <- read.csv("TaxonomicAndFunctionalAnnotations.csv", sep = "\t") #functional AND taxonomic annotation file 
+funtax <-  separate(funtax, full_classification, c("Domain","Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species"), sep = ";", fill = "right") #split "full_classification" column so that each classification level is its own column
+
+fun <- read.csv("full_function.csv", sep = "\t") #functional annotation only file  - has some extra information about functional annotation
+
+meta <- read.csv("dielRNA_eukrythmic.tsv", sep = "\t")
+meta4join <- meta %>% select(SampleID, SampleName, AssemblyGroup)
+meta4join$SampleID <- paste0(meta4join$SampleID, "_quant")
+row.names(meta4join) <- meta4join$SampleID
+```
+
+
+
+## deseq pca
+
+```{r}
+meta4deseq<- meta4join %>% separate(AssemblyGroup, c("Day", "Time"))
+meta4deseq$Day <- factor(meta4deseq$Day)
+row.names(meta4deseq) <- meta4deseq$SampleID
+meta4deseq<- data.frame(meta4deseq)
+```
+
+
+```{r}
+exp <- counts %>% select(-rowSum)
+row.names(exp) <- exp$SequenceID
+exp <- exp[,-1]
+exp<- exp %>% select(meta4join$SampleID)
+#count matrix column names need to be in same order as meta matrix row names
+exp_int <- lapply(exp,as.integer)
+exp_int <-data.frame(exp_int)
+```
+
+```{r}
+dds<- DESeqDataSetFromMatrix(countData = exp_int,
+                              colData = meta4deseq,
+                              design = ~ Time)
+dds
+```
+### variance stabilize
+
+```{r}
+vsd <- vst(dds, blind=TRUE)
+```
+
+
+```{r}
+pcaData <- plotPCA(vsd, intgroup=c("Day", "Time"), returnData=TRUE)
+percentVar <- round(100 * attr(pcaData, "percentVar"))
+ggplot(pcaData, aes(PC1, PC2, color=Day, shape=Time)) +
+  geom_point(size=3) +
+  xlab(paste0("PC1: ",percentVar[1],"% variance")) +
+  ylab(paste0("PC2: ",percentVar[2],"% variance")) + 
+  coord_fixed() + scale_colour_brewer(type="qual", palette="Dark2") 
+```
+
+## relative abundance plots
+```{r bacteria_only}
+funtax_bact <- funtax %>% filter(Domain == "Bacteria")
+
+funtax_bact$SequenceID<- gsub("\\..*","",funtax_bact$SequenceID)
+
+funtax_bact <- funtax_bact %>% select("SequenceID", "COG_category", "KEGG_ko", "PFAMs", "transcript_name", "Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species") 
+
+funtax_bact_reduced<- funtax_bact %>% group_by(SequenceID) %>% dplyr::slice(1) %>% ungroup
+```
+
+
+```{r bact_counts_annot}
+funtax_bact_count <- inner_join(funtax_bact_reduced, counts, by = "SequenceID")
+```
+
+```{r}
+
+abundance <- funtax_bact_count %>% select(starts_with("HM"))
+
+for (i in 1:(ncol(abundance))) {
+  abundance[i] <- (abundance[i] / sum(abundance[i]))*100
+}
+
+fun_tax_bact_relabund <- funtax_bact_count %>% select(-starts_with("HM"))
+fun_tax_bact_relabund <- cbind(fun_tax_bact_relabund, abundance)
+```
+
+```{r bact_tax_plot}
+funtax_bact_phylaplot <- fun_tax_bact_relabund %>% select(c(SequenceID, COG_category, Phylum, starts_with("HM"))) %>% pivot_longer(!c(SequenceID, COG_category, Phylum), names_to = "SampleID", values_to = "counts")
+
+meta4join <- meta %>% select(SampleID, SampleName, AssemblyGroup)
+meta4join$SampleID <- paste0(meta4join$SampleID, "_quant")
+
+funtax_bact_phylaplot <-left_join(funtax_bact_phylaplot, meta4join, by = "SampleID")
+
+Samplename_levels<- c("Day1_afternoon1" ,"Day1_afternoon2" ,"Day1_afternoon3", "Day1_evening1", "Day1_evening2"  , "Day1_evening3" ,  "Day1_night1" ,"Day1_night2", "Day1_night3","Day1_morning1", "Day1_morning2", "Day1_morning3","Day2_night1",  "Day2_night2"     ,"Day2_night3"   ,  "Day2_morning1" ,"Day2_morning2"  , "Day2_morning3","Day2_afternoon1" ,"Day2_afternoon2","Day2_afternoon3", "Day2_evening1" ,  "Day2_evening2"  , "Day2_evening3")
+
+funtax_bact_phylaplot$SampleName <- factor(funtax_bact_phylaplot$SampleName, levels=Samplename_levels) 
+
+#funtax_bact_phylaplot <- funtax_bact_phylaplot%>% filter(counts > 0)
+
+phylaplot<- funtax_bact_phylaplot %>% ggplot(aes(fill=Phylum, y=counts, x=SampleName)) + 
+    geom_bar(position="stack", stat="identity") + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+phylaplot
+```
+
+condense down low abundance taxa - fix colors
+
+```{r}
+funtax_bact_phylaplot_min1 <- funtax_bact_phylaplot %>% select(Phylum, SampleID, counts, SampleName) %>% group_by(Phylum, SampleID, SampleName) %>% mutate(phylasum = sum(counts)) %>% dplyr::slice(1) %>% ungroup()
+
+funtax_bact_phylaplot_min1$Phylum[funtax_bact_phylaplot_min1$phylasum < 1] <- "z< 1% abund."
+
+phylaplot<- funtax_bact_phylaplot_min1 %>% ggplot(aes(fill=Phylum, y=phylasum, x=SampleName)) + 
+    geom_bar(position="stack", stat="identity") + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) + scale_fill_manual(values = c(colors30[1], colors30[2], colors30[22], colors30[23], colors30[11], colors30[12], "grey"))
+
+                       
+                                                                                                                                     
+phylaplot
+```
+
+
+
+```{r}
+cogplot<- funtax_bact_phylaplot %>% ggplot(aes(fill=COG_category, y=counts, x=SampleName)) + 
+    geom_bar(position="stack", stat="identity") + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+cogplot
+```
+
+
+```{r}
+library("stringr")
+
+funtax_bact_phylaplot $COG_category1 <- substr(funtax_bact_phylaplot $COG_category, 0, 1) 
+
+cogplot<- funtax_bact_phylaplot %>% ggplot(aes(fill=COG_category1, y=counts, x=SampleName)) + 
+    geom_bar(position="stack", stat="identity") + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) + scale_fill_manual(values = colors30)
+cogplot
+
+```
+
+
+## Kegg
+
+```{r bact_kegg}
+library(stringi)
+
+funtax_bact_keggplot <- fun_tax_bact_relabund %>% select(c(SequenceID, KEGG_ko, Phylum, starts_with("HM"))) 
+funtax_bact_keggplot <-  separate(funtax_bact_keggplot, KEGG_ko, c("K1", "K2", "K3"), sep = ",", fill = "right") 
+funtax_bact_keggplot$K1 <- substr(funtax_bact_keggplot$K1, 4, 9) 
+
+Ks <- unique(funtax_bact_keggplot$K1)[-3]
+
+koslist <- Ks
+
+ paths <- character(length=0)
+ for(i in 1:length(koslist)) {
+   pathway <- system(paste0("curl https://rest.kegg.jp/link/pathway/", koslist[[i]]), intern=TRUE)
+    if (length(pathway) == 0) {
+      paths[[i]]<- "NA"
+    } else if (length(pathway) == 1) {
+      paths[[i]] <- stri_sub(pathway[[1]], 16)
+    } else {
+      l <- length(pathway)
+      paths[[i]] <- stri_sub(pathway[[2]], 16)
+    }
+ }
+ 
+ keggpaths <- data.frame(Ks, paths)
+ kegg$path<-paths
+
+## pathway ids
+
+#write.csv(keggpaths, "KO_pathway.csv")
+
+names(keggpaths) <- c("K1", "ko")
+
+funtax_bact_keggplot<- inner_join(funtax_bact_keggplot, keggpaths, by = "K1")
+
+abundance <- funtax_bact_keggplot %>% select(starts_with("HM"))
+
+for (i in 1:(ncol(abundance))) {
+  abundance[i] <- (abundance[i] / sum(abundance[i]))*100
+}
+
+
+funtax_bact_keggplot <- funtax_bact_keggplot %>% select(-starts_with("HM"))
+funtax_bact_keggplot<- cbind(funtax_bact_keggplot, abundance)
+```
+
+```{r bact_tax_plot}
+funtax_bact_keggplot <- funtax_bact_keggplot %>% select(c(SequenceID, ko, Phylum, starts_with("HM"))) %>% pivot_longer(!c(SequenceID, Phylum, ko), names_to = "SampleID", values_to = "counts")
+
+meta4join <- meta %>% select(SampleID, SampleName, AssemblyGroup)
+meta4join$SampleID <- paste0(meta4join$SampleID, "_quant")
+
+funtax_bact_keggplot <-left_join(funtax_bact_keggplot, meta4join, by = "SampleID")
+
+Samplename_levels<- c("Day1_afternoon1" ,"Day1_afternoon2" ,"Day1_afternoon3", "Day1_evening1", "Day1_evening2"  , "Day1_evening3" ,  "Day1_night1" ,"Day1_night2", "Day1_night3","Day1_morning1", "Day1_morning2", "Day1_morning3","Day2_night1",  "Day2_night2"     ,"Day2_night3"   ,  "Day2_morning1" ,"Day2_morning2"  , "Day2_morning3","Day2_afternoon1" ,"Day2_afternoon2","Day2_afternoon3", "Day2_evening1" ,  "Day2_evening2"  , "Day2_evening3")
+
+funtax_bact_keggplot$SampleName <- factor(funtax_bact_keggplot$SampleName, levels=Samplename_levels) 
+```
+
+
+```{r}
+funtax_bact_keggplot_min1 <- funtax_bact_keggplot %>% select(ko, SampleID, counts, SampleName) %>% group_by(ko, SampleID, SampleName) %>% mutate(kosum = sum(counts)) %>% dplyr::slice(1) %>% ungroup()
+
+funtax_bact_keggplot_min1$ko[funtax_bact_keggplot_min1$kosum < 0.5] <- "z< 0.5% abund."
+
+koplot<- funtax_bact_keggplot_min1 %>% ggplot(aes(fill=ko, y=kosum, x=SampleName)) + 
+    geom_bar(position="stack", stat="identity") + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) + scale_fill_manual(values = colors30)
+
+koplot
+```
+
