@@ -10,17 +10,18 @@ knitr::opts_chunk$set(echo = TRUE)
 
 rm(list = ls())
 
-package.list <- c("dplyr","tidyr","ggplot2","lemon","vegan")
+package.list <- c("dplyr","tidyverse","ggplot2","lemon","vegan","Rmisc")
 
 if(!all(package.list %in% installed.packages()[,"Package"])){
   install.packages(package.list[!(package.list %in% installed.packages()[,"Package"])])
 }
 
 library(dplyr)
-library(tidyr)
+library(tidyverse)
 library(ggplot2)
 library(lemon)
 library(vegan)
+library(Rmisc)
 
 #Subsectioning the bacteria data from the Taxonomic and Functional Annotations file####
 
@@ -30,17 +31,12 @@ library(vegan)
 # 
 # bacteria <- tax.func[tax.func$Domain == "Bacteria",]
 # 
-# for(i in 1:nrow(bacteria)){
-#   n.char <- nchar(bacteria$transcript_name[i])
+# bacteria$SequenceID <- ifelse(substring(bacteria$transcript_name, nchar(bacteria$transcript_name)-2, nchar(bacteria$transcript_name)-2) == ".",
+#                               bacteria$SequenceID <- substring(bacteria$transcript_name,1,nchar(bacteria$transcript_name)-3),
+#                               ifelse(substring(bacteria$transcript_name, nchar(bacteria$transcript_name)-3, nchar(bacteria$transcript_name)-3) == ".",
+#                                      bacteria$SequenceID <- substring(bacteria$transcript_name,1,nchar(bacteria$transcript_name)-4),
+#                                      bacteria$SequenceID <- bacteria$SequenceID))
 # 
-#   if(substring(bacteria$transcript_name[i], n.char-2, n.char-2) == "."){
-#     bacteria$SequenceID[i] <- substring(bacteria$transcript_name[i],1,n.char-3)
-# 
-#   } else if(substring(bacteria$transcript_name[i], n.char-3, n.char-3) == "."){
-#     bacteria$SequenceID[i] <- substring(bacteria$transcript_name[i],1,n.char-4)
-# 
-#   }
-# }
 # write.csv(bacteria,"CSV_files/Bacteria.subsection.TFA.csv", row.names = F)
 
 #Using the sequence ID's from the bacteria subsection to subsection the numreads and the TPM files####
@@ -75,61 +71,25 @@ Bacteria.TPM <- read.csv("CSV_files/Bacteria.subsection.TPM.csv")
 # Bacteria.TFA <- Bacteria.TFA[filter,]
 ```
 
-Filter for kegg.ko then add the rest afterwards.
-Try to optimize the sorting
+Filter for kegg.ko then add the rest afterwards. Done, and it worked
 
-```{r Data cleaning}
-# unique.vec <- unique(Bacteria.TFA$SequenceID)
+```{r}
+# filter <- Bacteria.TFA$KEGG_ko != "-"
 # 
-# for(i in 1:length(unique.vec)){
-#   if(i == 1){
-#     Time1 <- Sys.time()
-#     Time2 <- Sys.time()
+# Bacteria.KEGG <- Bacteria.TFA[filter,] %>% 
+#   distinct(SequenceID, .keep_all = TRUE)
 # 
-#     n <- 1
-#     df <- data.frame(matrix(ncol = ncol(Bacteria.TFA), nrow = length(unique.vec)))
-#     names(df) <- names(Bacteria.TFA)
-#   }
+# Bacteria.noKEGG <- Bacteria.TFA[!filter,] %>% 
+#   distinct(SequenceID, .keep_all = TRUE)
 # 
-#   vec <- Bacteria.TFA[Bacteria.TFA$SequenceID == unique.vec[i],]
+# filter2 <- Bacteria.noKEGG$SequenceID %in% Bacteria.KEGG$SequenceID
 # 
-#   if(nrow(vec) == 1){
-#     df[n,] <- vec
+# Bacteria.noKEGG <- Bacteria.noKEGG[!filter2,]
 # 
-#     n <- n+1
+# Bacteria.noRep <- rbind(Bacteria.KEGG,Bacteria.noKEGG)
 # 
-#   } else {
-#     filter <- vec$KEGG_ko == "-"
-# 
-#     if(sum(filter) == 1){
-# 
-#       df[n,] <- vec[filter,]
-# 
-#       n <- n+1
-#     } else {
-#       df[n,] <- vec[1,]
-# 
-#       n <- n+1
-#     }
-#   }
-# 
-#   if(i %% 5000 == 0){
-#     print(paste("i = ", i , " out of ", length(unique.vec),sep = ""))
-# 
-#     print(paste("time since start: ", round(Sys.time() - Time1,1)," minutes", sep = ""))
-#     print(paste("Time since last: ", round(Sys.time() - Time2,1)," minutes", sep = ""))
-# 
-#     Time2 <- Sys.time()
-#   }
-# 
-#   if(i == length(unique.vec)){
-#     df <- df[!is.na(df$X),]
-#   }
-# }
-# 
-# write.csv(df,"CSV_files/Bacteria.TFA_NoRep.csv",row.names = F)
+# write.csv(Bacteria.noRep,"CSV_files/Bacteria.TFA_NoRep.csv",row.names = F)
 ```
-
 
 ```{r}
 Bacteria.TFA <- read.csv("CSV_files/Bacteria.TFA_NoRep.csv")
@@ -182,24 +142,30 @@ df.other <- df.count[!top5.filter,]
 
 df.count2 <- rbind(df.top5,c(colSums(df.other[,1:24]),"Other"))
 
-order.vec <- c("Day1_morning1",   "Day1_morning2",   "Day1_morning3",
-               "Day1_afternoon1", "Day1_afternoon2", "Day1_afternoon3",
-               "Day1_evening1",   "Day1_evening2",   "Day1_evening3",
-               "Day1_night1",     "Day1_night2",     "Day1_night3",
-               "Day2_morning1",   "Day2_morning2",   "Day2_morning3",
-               "Day2_afternoon1", "Day2_afternoon2", "Day2_afternoon3",
-               "Day2_evening1",   "Day2_evening2",   "Day2_evening3",
-               "Day2_night1",     "Day2_night2",     "Day2_night3")
+order.vec <- c("Day1_morning",
+               "Day1_afternoon",
+               "Day1_evening",
+               "Day1_night",
+               "Day2_morning",
+               "Day2_afternoon",
+               "Day2_evening",
+               "Day2_night")
 
 dfOut <- pivot_longer(df.count2,
                       all_of(meta.data$SampleName),
                       names_to = "Day",
-                      values_to = "Count")
+                      values_to = "Count") %>% 
+  mutate(Count = as.numeric(dfOut$Count))
 
-p1 <- ggplot(dfOut)+
+dfOut$Day <- substring(dfOut$Day,1,nchar(dfOut$Day)-1)
+
+df.summ <- summarySE(data = dfOut, "Count",
+                     groupvars = c("Day","Class.vec"))
+
+p1 <- ggplot(df.summ)+
   geom_bar(aes(fill = factor(Class.vec,
                              levels = c("Unclassified","Other",top5.vec)),
-               y = as.numeric(Count),
+               y = Count,
                x = factor(Day, level = order.vec)),
            position = "stack", stat = "identity")+
   theme(axis.text.x = element_text(angle = 90,
@@ -251,28 +217,43 @@ for(i in 1:n){ #Looping through the Classes to count the occurrences.
      df.count <- cbind(df.count,Class.vec)
    }
     
-    df.count[i,j] <- mean(df.temp[,day.vec[j]])
+    df.count[i,j] <- sum(df.temp[,day.vec[j]])/sum(df.merged[,day.vec[j]])
     
   }
 }
 
-order.vec <- c("Day1_morning1",   "Day1_morning2",   "Day1_morning3",
-               "Day1_afternoon1", "Day1_afternoon2", "Day1_afternoon3",
-               "Day1_evening1",   "Day1_evening2",   "Day1_evening3",
-               "Day1_night1",     "Day1_night2",     "Day1_night3",
-               "Day2_morning1",   "Day2_morning2",   "Day2_morning3",
-               "Day2_afternoon1", "Day2_afternoon2", "Day2_afternoon3",
-               "Day2_evening1",   "Day2_evening2",   "Day2_evening3",
-               "Day2_night1",     "Day2_night2",     "Day2_night3")
+df.merged2 <- df.merged[df.merged$Class != "Unclassified",]
 
-dfOut <- pivot_longer(df.count,
+top5.vec <- names(table(df.merged2$Class)[order(-table(df.merged2$Class))[1:5]])
+
+top5.filter <- df.count$Class.vec %in% c(top5.vec,"Unclassified")
+
+df.top5 <- df.count[top5.filter,]
+df.other <- df.count[!top5.filter,]
+
+df.count2 <- rbind(df.top5,c(colSums(df.other[,1:24]),"Other"))
+
+order.vec <- c("Day1_morning",
+               "Day1_afternoon",
+               "Day1_evening",
+               "Day1_night",
+               "Day2_morning",
+               "Day2_afternoon",
+               "Day2_evening",
+               "Day2_night")
+
+dfOut <- pivot_longer(df.count2,
                       all_of(meta.data$SampleName),
                       names_to = "Day",
-                      values_to = "Count")
+                      values_to = "Count") %>% 
+  mutate(Count = as.numeric(Count))
 
-dfOut <- dfOut[dfOut$Class.vec == unique(dfOut$Class.vec)[1],]
+dfOut$Day <- substring(dfOut$Day,1,nchar(dfOut$Day)-1)
 
-p2 <- ggplot(data = dfOut)+
+df.summ <- summarySE(data = dfOut, "Count",
+                     groupvars = c("Day","Class.vec"))
+
+p2 <- ggplot(data = df.summ)+
   geom_line(aes(x = factor(Day, level = order.vec),
                 y = Count,
                 group = 1,
