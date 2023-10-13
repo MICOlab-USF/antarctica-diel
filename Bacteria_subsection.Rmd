@@ -10,7 +10,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 rm(list = ls())
 
-package.list <- c("dplyr","tidyverse","ggplot2","lemon","vegan","Rmisc")
+package.list <- c("dplyr","tidyverse","ggplot2","lemon","vegan","Rmisc","lubridate")
 
 if(!all(package.list %in% installed.packages()[,"Package"])){
   install.packages(package.list[!(package.list %in% installed.packages()[,"Package"])])
@@ -22,6 +22,7 @@ library(ggplot2)
 library(lemon)
 library(vegan)
 library(Rmisc)
+library(lubridate)
 
 #Subsectioning the bacteria data from the Taxonomic and Functional Annotations file####
 
@@ -29,7 +30,9 @@ library(Rmisc)
 # 
 # tax.func <- separate(tax.func,col = full_classification,into = c("Domain","Supergroup","Division","Class","Order","Family","Genus","Species"), sep = ";", remove = FALSE, fill = "right", extra = "drop")
 # 
-# bacteria <- tax.func[tax.func$Domain == "Bacteria",]
+# tax.func$Domain <- ifelse(substring(tax.func$Domain,1,1) == " ", substring(tax.func$Domain,2), tax.func$Domain)
+# 
+# Bacteria <- tax.func[tax.func$Domain == "Bacteria",]
 # 
 # bacteria$SequenceID <- ifelse(substring(bacteria$transcript_name, nchar(bacteria$transcript_name)-2, nchar(bacteria$transcript_name)-2) == ".",
 #                               bacteria$SequenceID <- substring(bacteria$transcript_name,1,nchar(bacteria$transcript_name)-3),
@@ -56,7 +59,14 @@ library(Rmisc)
 
 #Reading the Bacteria numread and TPM subsectioned files.####
 
-meta.data <- read.csv("CSV_files/dielRNA_eukrythmic.tsv", sep = "\t")
+met.dat1 <- read.csv("CSV_files/dielRNA_eukrythmic.tsv", sep = "\t")
+met.dat2 <- read.csv("sample_metadata.csv") %>% 
+  mutate(Sample_ID = paste("HM",Sample_ID,sep = ""))
+
+names(met.dat2)[names(met.dat2) == "Sample_ID"] <- "SampleID"
+
+meta.data <- merge(met.dat1,met.dat2,by = "SampleID") %>% 
+  mutate(datetime = ymd(substring(lubri,1,10))+hms(substring(lubri,12,19)))
 
 #Raw read
 Bacteria.numread <- read.csv("CSV_files/Bacteria.subsection.numreads.csv")
@@ -76,10 +86,10 @@ Filter for kegg.ko then add the rest afterwards. Done, and it worked
 ```{r}
 # filter <- Bacteria.TFA$KEGG_ko != "-"
 # 
-# Bacteria.KEGG <- Bacteria.TFA[filter,] %>% 
+# Bacteria.KEGG <- Bacteria.TFA[filter,] %>%
 #   distinct(SequenceID, .keep_all = TRUE)
 # 
-# Bacteria.noKEGG <- Bacteria.TFA[!filter,] %>% 
+# Bacteria.noKEGG <- Bacteria.TFA[!filter,] %>%
 #   distinct(SequenceID, .keep_all = TRUE)
 # 
 # filter2 <- Bacteria.noKEGG$SequenceID %in% Bacteria.KEGG$SequenceID
@@ -142,20 +152,20 @@ df.other <- df.count[!top5.filter,]
 
 df.count2 <- rbind(df.top5,c(colSums(df.other[,1:24]),"Other"))
 
-order.vec <- c("Day1_morning",
-               "Day1_afternoon",
+order.vec <- c("Day1_afternoon",
                "Day1_evening",
                "Day1_night",
+               "Day1_morning",
+               "Day2_night",
                "Day2_morning",
                "Day2_afternoon",
-               "Day2_evening",
-               "Day2_night")
+               "Day2_evening")
 
 dfOut <- pivot_longer(df.count2,
                       all_of(meta.data$SampleName),
                       names_to = "Day",
                       values_to = "Count") %>% 
-  mutate(Count = as.numeric(dfOut$Count))
+  mutate(Count = as.numeric(Count))
 
 dfOut$Day <- substring(dfOut$Day,1,nchar(dfOut$Day)-1)
 
@@ -224,7 +234,7 @@ for(i in 1:n){ #Looping through the Classes to count the occurrences.
 
 df.merged2 <- df.merged[df.merged$Class != "Unclassified",]
 
-top5.vec <- names(table(df.merged2$Class)[order(-table(df.merged2$Class))[1:5]])
+top5.vec <- names(table(df.merged2$Class)[order(-table(df.merged2$Class))[1:7]])
 
 top5.filter <- df.count$Class.vec %in% c(top5.vec,"Unclassified")
 
@@ -253,14 +263,64 @@ dfOut$Day <- substring(dfOut$Day,1,nchar(dfOut$Day)-1)
 df.summ <- summarySE(data = dfOut, "Count",
                      groupvars = c("Day","Class.vec"))
 
-p2 <- ggplot(data = df.summ)+
-  geom_line(aes(x = factor(Day, level = order.vec),
+Day.Time <- meta.data[,c("AssemblyGroup","datetime")]
+names(Day.Time)[names(Day.Time) == "AssemblyGroup"] <- "Day"
+
+dfOut2 <- merge(df.summ,Day.Time,by = "Day")
+
+for(i in 1:length(unique(dfOut2$Class.vec))){
+  filter <- dfOut2$Class.vec == unique(dfOut2$Class.vec)[i]
+  
+  dfTemp <- dfOut2[filter,] %>% 
+    mutate(norm.data = (Count-min(Count))/(max(Count)-min(Count)))
+  
+  if(i != 1){
+    dfOut3 <- rbind(dfTemp,dfOut3)
+  } else {
+    dfOut3 <- dfTemp
+  }
+}
+
+# p2 <- ggplot(data = dfOut3)+
+#   geom_line(aes(x = datetime,
+#                 y = norm.data,
+#                 color = Class.vec))+
+#   geom_point(aes(x = datetime,
+#                 y = norm.data,
+#                 color = Class.vec))+
+#   scale_x_continuous(breaks = unique(meta.data$datetime),
+#                      labels = unique(meta.data$AssemblyGroup))+
+#   theme(axis.text.x = element_text(angle = 90,
+#                                    vjust = 0.5,
+#                                    hjust=1))
+# 
+# p2
+
+p2 <- ggplot(data = dfOut2)+
+  geom_line(aes(x = datetime,
                 y = Count,
-                group = 1,
                 color = Class.vec))+
+  geom_point(aes(x = datetime,
+                y = Count,
+                color = Class.vec))+
+  geom_errorbar(aes(x = datetime,
+                    y = Count,
+                    ymax = Count+sd,
+                    ymin = Count-sd))+
+  facet_wrap(facets = "Class.vec",
+             nrow = 3,
+             ncol = 3,
+             scales = "free_y")+
+  scale_x_continuous(breaks = unique(meta.data$datetime),
+                     labels = unique(meta.data$AssemblyGroup))+
+  labs(title = "Relative numreads per day",
+       y = "numreads per class / total numreads per day",
+       x = "Time of sample")+
+  theme_classic()+
   theme(axis.text.x = element_text(angle = 90,
                                    vjust = 0.5,
-                                   hjust=1))
+                                   hjust=1),
+        legend.position = "none")
 
 p2
 ```

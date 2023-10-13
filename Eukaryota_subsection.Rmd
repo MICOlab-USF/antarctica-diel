@@ -1,0 +1,412 @@
+---
+title: "Eukaryote_subsection"
+author: "Andreas Norlin"
+date: "2023-10-13"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+rm(list = ls())
+
+package.list <- c("dplyr","tidyverse","ggplot2","lemon","vegan","Rmisc","lubridate")
+
+if(!all(package.list %in% installed.packages()[,"Package"])){
+  install.packages(package.list[!(package.list %in% installed.packages()[,"Package"])])
+}
+
+library(dplyr)
+library(tidyverse)
+library(ggplot2)
+library(lemon)
+library(vegan)
+library(Rmisc)
+library(lubridate)
+
+meta.data1 <- read.csv("CSV_files/dielRNA_eukrythmic.tsv", sep = "\t")
+meta.data2 <- read.csv("sample_metadata.csv") %>% 
+  mutate(Sample_ID = paste("HM",Sample_ID,sep = ""))
+
+names(meta.data2)[names(meta.data2) == "Sample_ID"] <- "SampleID"
+
+meta.data <- merge(meta.data1,meta.data2,by = "SampleID") %>% 
+  mutate(datetime = ymd(substring(lubri,1,10))+hms(substring(lubri,12,19)))
+
+Eukaryota.merged <- read.csv("CSV_files/Eukaryota.merged.csv")
+```
+
+
+
+```{r}
+#Subsectioning the Eukaryota data from the Taxonomic and Functional Annotations file####
+
+# tax.func <- read.csv("CSV_files/TaxonomicAndFunctionalAnnotations.csv", sep = "\t")
+# 
+# tax.func <- separate(tax.func,col = full_classification,into = c("Domain","Supergroup","Division","Class","Order","Family","Genus","Species"), sep = "; ", remove = FALSE, fill = "right", extra = "drop")
+# 
+# tax.func$Domain <- ifelse(substring(tax.func$Domain,1,1) == " ", substring(tax.func$Domain,2), tax.func$Domain)
+# 
+# Eukaryota <- tax.func[tax.func$Domain == "Eukaryota",]
+# 
+# Eukaryota$SequenceID <- ifelse(substring(Eukaryota$transcript_name, nchar(Eukaryota$transcript_name)-2, nchar(Eukaryota$transcript_name)-2) == ".",
+#                               Eukaryota$SequenceID <- substring(Eukaryota$transcript_name,1,nchar(Eukaryota$transcript_name)-3),
+#                               ifelse(substring(Eukaryota$transcript_name, nchar(Eukaryota$transcript_name)-3, nchar(Eukaryota$transcript_name)-3) == ".",
+#                                      Eukaryota$SequenceID <- substring(Eukaryota$transcript_name,1,nchar(Eukaryota$transcript_name)-4),
+#                                      Eukaryota$SequenceID <- Eukaryota$SequenceID))
+# 
+# write.csv(Eukaryota,"CSV_files/Eukaryota.subsection.TFA.csv", row.names = F)
+```
+
+
+```{r}
+#Using the sequence ID's from the Eukaryota subsection to subsection the numreads and the TPM files####
+
+# Eukaryota <- read.csv("CSV_files/Eukaryota.subsection.TFA.csv")
+# 
+# salmon.TPM <- read.csv("CSV_files/salmon.merged.TPM.subset5.csv")
+# 
+# salmon.numread <- read.csv("CSV_files/salmon.merged.numreads.subset5.csv")
+# filter <- salmon.numread$Name %in% Eukaryota$SequenceID
+# 
+# Eukaryota.numread <- salmon.numread[filter,]
+# write.csv(Eukaryota.numread,"CSV_files/Eukaryota.subsection.numreads.csv",row.names = F)
+# 
+# Eukaryota.TPM <- salmon.TPM[filter,]
+# write.csv(Eukaryota.TPM, "CSV_files/Eukaryota.subsection.TPM.csv",row.names = F)
+```
+
+
+```{r}
+#Reading the Eukaryota numread and TPM subsectioned files.####
+
+# #Raw read
+# Eukaryota.numread <- read.csv("CSV_files/Eukaryota.subsection.numreads.csv")
+# 
+# #Transcripts per million
+# Eukaryota.TPM <- read.csv("CSV_files/Eukaryota.subsection.TPM.csv")
+# 
+# Eukaryota.TFA <- read.csv("CSV_files/Eukaryota.subsection.TFA.csv")
+# #Filtering out the sequences present in the Taxonomy and functional annotations data, but not in the numread/TPM
+# filter <- Eukaryota.TFA$SequenceID %in% Eukaryota.numread$Name
+# 
+# Eukaryota.TFA <- Eukaryota.TFA[filter,]
+# 
+# filter <- Eukaryota.TFA$KEGG_ko != "-"
+# 
+# Eukaryota.KEGG <- Eukaryota.TFA[filter,] %>%
+#   distinct(SequenceID, .keep_all = TRUE)
+# 
+# Eukaryota.noKEGG <- Eukaryota.TFA[!filter,] %>%
+#   distinct(SequenceID, .keep_all = TRUE)
+# 
+# filter2 <- Eukaryota.noKEGG$SequenceID %in% Eukaryota.KEGG$SequenceID
+# 
+# Eukaryota.noKEGG <- Eukaryota.noKEGG[!filter2,]
+# 
+# Eukaryota.noRep <- rbind(Eukaryota.KEGG,Eukaryota.noKEGG)
+# 
+# write.csv(Eukaryota.noRep,"CSV_files/Eukaryota.TFA_NoRep.csv",row.names = F)
+# ```
+# 
+# ```{r}
+# #Raw read
+# Eukaryota.numread <- read.csv("CSV_files/Eukaryota.subsection.numreads.csv")
+# 
+# #Transcripts per million
+# Eukaryota.TPM <- read.csv("CSV_files/Eukaryota.subsection.TPM.csv")
+# 
+# #Taxonomy and functional annotation
+# Eukaryota.TFA <- read.csv("CSV_files/Eukaryota.subsection.TFA.csv")
+# 
+# tax.levels <- c("Domain","Supergroup","Division","Class","Order","Family","Genus","Species")[3:4]
+# n <- length(tax.levels)
+# 
+# for(i in 1:n){
+#   Eukaryota.TFA[,tax.levels[i]] <-
+# }
+# 
+# Eukaryota.TFA$Class <- ifelse(substring(Eukaryota.TFA$Class,nchar(Eukaryota.TFA$Class)-7) == " (Class)",
+#                              substring(Eukaryota.TFA$Class,1,nchar(Eukaryota.TFA$Class)-8),
+#                              Eukaryota.TFA$Class)
+# 
+# names(Eukaryota.numread)[1] <- "SequenceID"
+# 
+# df.merged <- merge(Eukaryota.numread,Eukaryota.TFA,by = "SequenceID")
+# 
+# df.merged$Class[is.na(df.merged$Class)] <- "Unclassified"
+# 
+# write.csv(df.merged,"CSV_files/Eukaryota.merged.csv",row.names = F)
+```
+
+
+```{r}
+df.merged <- Eukaryota.merged
+
+Class.vec <- unique(df.merged$Class)
+n <- length(Class.vec)
+
+day.vec <- paste(meta.data$SampleID,"_quant",sep = "")
+m <- length(day.vec)
+
+for(i in 1:n){ #Looping through the Classes to count the occurrences.
+  
+  Class.filter <- df.merged$Class == Class.vec[i]
+  df.temp <- df.merged[Class.filter,]
+  
+  for(j in 1:m){ #Looping through the sampling time points.
+    
+   if(i == 1 & j == 1){ #Sets up an empty data.frame to input the data
+     
+     df.count <- data.frame(matrix(ncol = m, nrow = n))
+     names(df.count) <- meta.data$SampleName
+     
+     df.count <- cbind(df.count,Class.vec)
+   }
+    
+    df.count[i,j] <- sum(df.temp[,day.vec[j]])/sum(df.merged[,day.vec[j]])
+    
+  }
+}
+
+df.merged2 <- df.merged[df.merged$Class != "Unclassified",]
+
+top5.vec <- names(table(df.merged2$Class)[order(-table(df.merged2$Class))[1:5]])
+
+top5.filter <- df.count$Class.vec %in% c(top5.vec,"Unclassified")
+
+df.top5 <- df.count[top5.filter,]
+df.other <- df.count[!top5.filter,]
+
+df.count2 <- rbind(df.top5,c(colSums(df.other[,1:24]),"Other"))
+
+order.vec <- c("Day1_afternoon",
+               "Day1_evening",
+               "Day1_night",
+               "Day1_morning",
+               "Day2_night",
+               "Day2_morning",
+               "Day2_afternoon",
+               "Day2_evening")
+
+dfOut <- pivot_longer(df.count2,
+                      all_of(meta.data$SampleName),
+                      names_to = "Day",
+                      values_to = "Count") %>% 
+  mutate(Count = as.numeric(Count))
+
+dfOut$Day <- substring(dfOut$Day,1,nchar(dfOut$Day)-1)
+
+df.summ <- summarySE(data = dfOut, "Count",
+                     groupvars = c("Day","Class.vec"))
+
+Day.Time <- meta.data[,c("AssemblyGroup","datetime")] %>% 
+  distinct(AssemblyGroup, .keep_all = TRUE)
+
+names(Day.Time)[names(Day.Time) == "AssemblyGroup"] <- "Day"
+
+dfOut2 <- merge(df.summ,Day.Time,by = "Day")
+
+partime$norm.par <- partime$par / max(partime$par)
+
+p1 <- ggplot(dfOut2)+
+  geom_bar(aes(fill = factor(Class.vec,
+                             levels = c("Unclassified","Other",top5.vec)),
+               y = Count,
+               x = datetime),
+           position = "stack", stat = "identity")+
+  theme_classic()+
+  theme(axis.text.x = element_text(angle = 90,
+                                   vjust = 0.5,
+                                   hjust=1))+
+  guides(fill = guide_legend(title = "Class"))
+
+scale <- max(partime$par)
+
+p1 <- p1 +
+  geom_line(data = partime,
+            aes(x = lubri,
+                y = norm.par,
+                alpha = 0.5))+
+  scale_y_continuous(sec.axis = sec_axis(~.*scale, name = "Secondary Y-axis"))
+
+p1
+```
+
+```{r}
+df.merged <- Eukaryota.merged
+
+Class.vec <- unique(df.merged$Class)
+n <- length(Class.vec)
+
+day.vec <- paste(meta.data$SampleID,"_quant",sep = "")
+m <- length(day.vec)
+
+for(i in 1:n){ #Looping through the Classes to count the occurrences.
+  
+  Class.filter <- df.merged$Class == Class.vec[i]
+  df.temp <- df.merged[Class.filter,]
+  
+  for(j in 1:m){ #Looping through the sampling time points.
+    
+   if(i == 1 & j == 1){ #Sets up an empty data.frame to input the data
+     
+     df.count <- data.frame(matrix(ncol = m, nrow = n))
+     names(df.count) <- meta.data$SampleName
+     
+     df.count <- cbind(df.count,Class.vec)
+   }
+    
+    df.count[i,j] <- sum(df.temp[,day.vec[j]])/sum(df.merged[,day.vec[j]])
+    
+  }
+}
+
+df.merged2 <- df.merged[df.merged$Class != "Unclassified",]
+
+top5.vec <- names(table(df.merged2$Class)[order(-table(df.merged2$Class))[1:10]])
+
+top5.filter <- df.count$Class.vec %in% c(top5.vec,"Unclassified")
+
+df.top5 <- df.count[top5.filter,]
+df.other <- df.count[!top5.filter,]
+
+df.count2 <- rbind(df.top5,c(colSums(df.other[,1:24]),"Other"))
+
+order.vec <- c("Day1_morning",
+               "Day1_afternoon",
+               "Day1_evening",
+               "Day1_night",
+               "Day2_morning",
+               "Day2_afternoon",
+               "Day2_evening",
+               "Day2_night")
+
+dfOut <- pivot_longer(df.count2,
+                      all_of(meta.data$SampleName),
+                      names_to = "Day",
+                      values_to = "Count") %>% 
+  mutate(Count = as.numeric(Count))
+
+dfOut$Day <- substring(dfOut$Day,1,nchar(dfOut$Day)-1)
+
+df.summ <- summarySE(data = dfOut, "Count",
+                     groupvars = c("Day","Class.vec"))
+
+Day.Time <- meta.data[,c("AssemblyGroup","datetime")]
+names(Day.Time)[names(Day.Time) == "AssemblyGroup"] <- "Day"
+
+dfOut2 <- merge(df.summ,Day.Time,by = "Day")
+
+for(i in 1:length(unique(dfOut2$Class.vec))){
+  filter <- dfOut2$Class.vec == unique(dfOut2$Class.vec)[i]
+  
+  dfTemp <- dfOut2[filter,] %>% 
+    mutate(norm.data = (Count-min(Count))/(max(Count)-min(Count)))
+  
+  if(i != 1){
+    dfOut3 <- rbind(dfTemp,dfOut3)
+  } else {
+    dfOut3 <- dfTemp
+  }
+}
+
+# p2 <- ggplot(data = dfOut3)+
+#   geom_line(aes(x = datetime,
+#                 y = norm.data,
+#                 color = Class.vec))+
+#   geom_point(aes(x = datetime,
+#                 y = norm.data,
+#                 color = Class.vec))+
+#   scale_x_continuous(breaks = unique(meta.data$datetime),
+#                      labels = unique(meta.data$AssemblyGroup))+
+#   theme(axis.text.x = element_text(angle = 90,
+#                                    vjust = 0.5,
+#                                    hjust=1))
+# 
+# p2
+
+p2 <- ggplot(data = dfOut2)+
+  geom_line(aes(x = datetime,
+                y = Count,
+                color = Class.vec))+
+  geom_point(aes(x = datetime,
+                y = Count,
+                color = Class.vec))+
+  geom_errorbar(aes(x = datetime,
+                    y = Count,
+                    ymax = Count+sd,
+                    ymin = Count-sd))+
+  facet_wrap(facets = "Class.vec",
+             nrow = 3,
+             ncol = 4,
+             scales = "free_y")+
+  scale_x_continuous(breaks = unique(meta.data$datetime),
+                     labels = unique(meta.data$AssemblyGroup))+
+  labs(title = "Relative numreads per day",
+       y = "numreads per class / total numreads per day",
+       x = "Time of sample")+
+  theme_classic()+
+  theme(axis.text.x = element_text(angle = 90,
+                                   vjust = 0.5,
+                                   hjust=1),
+        legend.position = "none")
+
+p2
+```
+
+```{r}
+library(lubridate)
+
+par1 <- read.delim("NBP2113pguv.d342",  sep = " ", header =FALSE)
+par2<- read.delim("NBP2113pguv.d343",  sep = " ", header =FALSE)
+par3<- read.delim("NBP2113pguv.d344",  sep = " ", header =FALSE)
+
+par = rbind(par1, par2, par3)[-1,c(1,2,3,10)]
+names(par) <- c("juliendatetime","date", "time", "par")
+
+partime <- par %>% separate(juliendatetime, c("yearday","hour", "min", "sec"), sep = ":" ) %>% unite(utctime, hour, min, sec, sep=":")  %>% mutate(utcdatetime = paste(date, utctime))
+
+partime$lubri <- with_tz(mdy_hms(partime$utcdatetime, tz = "UTC"),
+tz = "America/Santiago") 
+
+# partime %>% ggplot(aes(x = lubri, y= par  )) + geom_line()
+
+p2 <- ggplot(data = dfOut2)+
+  geom_line(aes(x = datetime,
+                y = Count,
+                color = Class.vec))+
+  geom_line(data = partime,
+            aes(x = lubri,
+                y = par))+
+  geom_point(aes(x = datetime,
+                y = Count,
+                color = Class.vec))+
+  geom_errorbar(aes(x = datetime,
+                    y = Count,
+                    ymax = Count+sd,
+                    ymin = Count-sd))+
+  facet_wrap(facets = "Class.vec",
+             nrow = 3,
+             ncol = 4,
+             scales = "free_y")+
+  scale_x_continuous(breaks = unique(meta.data$datetime),
+                     labels = unique(meta.data$AssemblyGroup))+
+  labs(title = "Relative numreads per day",
+       y = "numreads per class / total numreads per day",
+       x = "Time of sample")+
+  theme_classic()+
+  theme(axis.text.x = element_text(angle = 90,
+                                   vjust = 0.5,
+                                   hjust=1),
+        legend.position = "none")
+
+p3 <- p2+
+  geom_line(data = partime,
+            aes(x = lubri,
+                y = par))+
+  scale_y_continuous(sec.axis = sec_axis(~ ., name = "Secondary Y-axis"))
+
+p3
+```
+
