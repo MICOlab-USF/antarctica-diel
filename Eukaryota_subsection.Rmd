@@ -151,6 +151,74 @@ Eukaryota.merged <- read.csv("CSV_files/Eukaryota.merged.csv")
 # write.csv(df.merged,"CSV_files/Eukaryota.merged2.csv",row.names = F)
 ```
 
+```{r}
+library(lubridate)
+
+par1 <- read.delim("NBP2113pguv.d342",  sep = " ", header =FALSE)
+par2<- read.delim("NBP2113pguv.d343",  sep = " ", header =FALSE)
+par3<- read.delim("NBP2113pguv.d344",  sep = " ", header =FALSE)
+
+par = rbind(par1, par2, par3)[-1,c(1,2,3,10)]
+names(par) <- c("juliendatetime","date", "time", "par")
+
+partime <- par %>% separate(juliendatetime, c("yearday","hour", "min", "sec"), sep = ":" ) %>% unite(utctime, hour, min, sec, sep=":")  %>% mutate(utcdatetime = paste(date, utctime))
+
+partime$lubri <- with_tz(mdy_hms(partime$utcdatetime, tz = "UTC"),
+tz = "America/Santiago")
+
+partime$norm.par <- partime$par / max(partime$par)
+
+partime %>% ggplot(aes(x = lubri, 
+                       y= 1,
+                       colour = par))+
+  geom_line()+
+  scale_color_gradient(low = "blue",high = "red")
+
+
+# df.test <- data.frame(cbind(x = rep(1,10), y = 1:10))
+# 
+# p4 <- ggplot(df.test)+
+#   geom_tile(aes(x = y , y = x, fill = y),
+#            stat = "identity")
+# 
+# p4
+
+m <- 1
+time.int <- ms("01.00")
+for(i in 1:nrow(partime)){
+  if(i == 1){
+    vec <- NA
+    n <- 1
+  }
+  
+  test.vec <- partime$lubri[i] - partime$lubri[m]
+  
+  if(test.vec > time.int){
+    m <- i
+    
+    vec[n] <- i
+    n <- n+1
+  }
+  
+}
+
+data.length <- vec
+
+dfOut <- partime[data.length,]
+
+p5 <- ggplot(dfOut)+
+  geom_tile(aes(x = lubri,y = 0.5, fill = par),
+           stat = "identity")+
+  scale_fill_gradient(low = "black",high = "yellow")+
+  theme_minimal()+
+  geom_line(aes(x = lubri,y = norm.par,color = "red"))
+
+p5
+
+partime2 <- dfOut
+
+```
+
 
 ```{r}
 df.merged <- Eukaryota.merged
@@ -305,7 +373,9 @@ dfOut$Day <- substring(dfOut$Day,1,nchar(dfOut$Day)-1)
 df.summ <- summarySE(data = dfOut, "Count",
                      groupvars = c("Day","Class.vec"))
 
-Day.Time <- meta.data[,c("AssemblyGroup","datetime")]
+Day.Time <- meta.data[,c("AssemblyGroup","datetime")] %>% 
+  distinct(AssemblyGroup, .keep_all = TRUE)
+
 names(Day.Time)[names(Day.Time) == "AssemblyGroup"] <- "Day"
 
 dfOut2 <- merge(df.summ,Day.Time,by = "Day")
@@ -368,42 +438,50 @@ p2
 ```
 
 ```{r}
-library(lubridate)
 
-par1 <- read.delim("NBP2113pguv.d342",  sep = " ", header =FALSE)
-par2<- read.delim("NBP2113pguv.d343",  sep = " ", header =FALSE)
-par3<- read.delim("NBP2113pguv.d344",  sep = " ", header =FALSE)
+m <- 1
+time.int <- ms("00.30")
+for(i in 1:nrow(partime)){
+  if(i == 1){
+    vec <- NA
+    n <- 1
+  }
+  
+  test.vec <- partime$lubri[i] - partime$lubri[m]
+  
+  if(test.vec > time.int){
+    m <- i
+    
+    vec[n] <- i
+    n <- n+1
+  }
+  
+}
 
-par = rbind(par1, par2, par3)[-1,c(1,2,3,10)]
-names(par) <- c("juliendatetime","date", "time", "par")
+partime2 <- partime[vec,]
 
-partime <- par %>% separate(juliendatetime, c("yearday","hour", "min", "sec"), sep = ":" ) %>% unite(utctime, hour, min, sec, sep=":")  %>% mutate(utcdatetime = paste(date, utctime))
+filter <- partime2$lubri < min(dfOut2$datetime)
 
-partime$lubri <- with_tz(mdy_hms(partime$utcdatetime, tz = "UTC"),
-tz = "America/Santiago") 
+partime2 <- partime2[!filter,]
 
-# partime %>% ggplot(aes(x = lubri, y= par  )) + geom_line()
+for(i in 1:length(unique(dfOut2$Class.vec))){
+  if(i == 1){
+    dfOut2$norm.Count <- NA
+    dfOut2$norm.sd <- NA
+  }
+  
+  class.vec <- unique(dfOut2$Class.vec)[i]
+
+  filter <- dfOut2$Class.vec == class.vec
+
+  dfOut2$norm.Count[filter] <- dfOut2$Count[filter] / max(dfOut2$Count[filter])
+  dfOut2$norm.sd[filter] <- dfOut2$sd[filter] * (dfOut2$norm.Count[filter] / dfOut2$Count[filter])
+  
+  dfOut2$norm.Count[filter] <- dfOut2$norm.Count[filter] - min(dfOut2$norm.Count[filter])+0.1
+  
+}
 
 p2 <- ggplot(data = dfOut2)+
-  geom_line(aes(x = datetime,
-                y = Count,
-                color = Class.vec))+
-  geom_line(data = partime,
-            aes(x = lubri,
-                y = par))+
-  geom_point(aes(x = datetime,
-                y = Count,
-                color = Class.vec))+
-  geom_errorbar(aes(x = datetime,
-                    y = Count,
-                    ymax = Count+sd,
-                    ymin = Count-sd))+
-  facet_wrap(facets = "Class.vec",
-             nrow = 3,
-             ncol = 4,
-             scales = "free_y")+
-  scale_x_continuous(breaks = unique(meta.data$datetime),
-                     labels = unique(meta.data$AssemblyGroup))+
   labs(title = "Relative numreads per day",
        y = "numreads per class / total numreads per day",
        x = "Time of sample")+
@@ -411,15 +489,41 @@ p2 <- ggplot(data = dfOut2)+
   theme(axis.text.x = element_text(angle = 90,
                                    vjust = 0.5,
                                    hjust=1),
-        legend.position = "none")
+        legend.position = "none",
+        axis.line.y.right = element_blank(),
+        axis.title.y.right = element_blank(),
+        axis.text.y.right = element_blank(),
+        axis.ticks.y.right = element_blank())
 
 p3 <- p2+
-  geom_line(data = partime,
+  geom_tile(data = partime2,
             aes(x = lubri,
-                y = par))+
-  scale_y_continuous(sec.axis = sec_axis(~ ., name = "Secondary Y-axis"))
+                y = 0.5,
+                fill = par,
+                alpha = 0.8))+
+  scale_y_continuous(sec.axis = sec_axis(~ ., name = "Secondary Y-axis"))+
+  scale_fill_gradient(low = "black",high = "yellow")+
+  geom_line(aes(x = datetime,
+                y = norm.Count,
+                color = Class.vec))+
+  geom_point(aes(x = datetime,
+                y = norm.Count,
+                color = Class.vec))+
+  geom_errorbar(aes(x = datetime,
+                    y = norm.Count,
+                    ymax = norm.Count+norm.sd,
+                    ymin = norm.Count-norm.sd))+
+  facet_wrap(facets = "Class.vec",
+             nrow = 3,
+             ncol = 4,
+             scales = "free_y")+
+  scale_x_continuous(breaks = unique(meta.data$datetime),
+                     labels = unique(meta.data$AssemblyGroup))+
+  coord_cartesian(ylim = c(0,0.75))
 
 p3
+
+ggsave("Test_plot.png",p3,width = 10,height = 6,dpi = 300)
 ```
 
 Z-scale
