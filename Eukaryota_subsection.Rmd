@@ -80,7 +80,7 @@ Eukaryota.merged <- read.csv("CSV_files/Eukaryota.merged.csv")
 ```{r}
 #Reading the Eukaryota numread and TPM subsectioned files.####
 
-# #Raw read
+#Raw read
 # Eukaryota.numread <- read.csv("CSV_files/Eukaryota.subsection.numreads.csv")
 # 
 # #Transcripts per million
@@ -107,10 +107,22 @@ Eukaryota.merged <- read.csv("CSV_files/Eukaryota.merged.csv")
 # Eukaryota.noRep <- rbind(Eukaryota.KEGG,Eukaryota.noKEGG)
 # 
 # write.csv(Eukaryota.noRep,"CSV_files/Eukaryota.TFA_NoRep.csv",row.names = F)
-# ```
 # 
-# ```{r}
-# #Raw read
+# Eukaryota.noRep$Class <- ifelse(substring(Eukaryota.noRep$Class,nchar(Eukaryota.noRep$Class)-7) == " (Class)",
+#                              substring(Eukaryota.noRep$Class,1,nchar(Eukaryota.noRep$Class)-8),
+#                              Eukaryota.noRep$Class)
+# 
+# names(Eukaryota.numread)[1] <- "SequenceID"
+# 
+# df.merged <- merge(Eukaryota.numread,Eukaryota.noRep,by = "SequenceID")
+# 
+# df.merged$Class[is.na(df.merged$Class)] <- "Unclassified"
+# 
+# write.csv(df.merged,"CSV_files/Eukaryota.merged.csv",row.names = F)
+```
+
+```{r}
+#Raw read
 # Eukaryota.numread <- read.csv("CSV_files/Eukaryota.subsection.numreads.csv")
 # 
 # #Transcripts per million
@@ -136,7 +148,7 @@ Eukaryota.merged <- read.csv("CSV_files/Eukaryota.merged.csv")
 # 
 # df.merged$Class[is.na(df.merged$Class)] <- "Unclassified"
 # 
-# write.csv(df.merged,"CSV_files/Eukaryota.merged.csv",row.names = F)
+# write.csv(df.merged,"CSV_files/Eukaryota.merged2.csv",row.names = F)
 ```
 
 
