@@ -81,74 +81,69 @@ Eukaryota.merged <- read.csv("CSV_files/Eukaryota.merged.csv")
 #Reading the Eukaryota numread and TPM subsectioned files.####
 
 #Raw read
-# Eukaryota.numread <- read.csv("CSV_files/Eukaryota.subsection.numreads.csv")
-# 
-# #Transcripts per million
-# Eukaryota.TPM <- read.csv("CSV_files/Eukaryota.subsection.TPM.csv")
-# 
-# Eukaryota.TFA <- read.csv("CSV_files/Eukaryota.subsection.TFA.csv")
-# #Filtering out the sequences present in the Taxonomy and functional annotations data, but not in the numread/TPM
-# filter <- Eukaryota.TFA$SequenceID %in% Eukaryota.numread$Name
-# 
-# Eukaryota.TFA <- Eukaryota.TFA[filter,]
-# 
-# filter <- Eukaryota.TFA$KEGG_ko != "-"
-# 
-# Eukaryota.KEGG <- Eukaryota.TFA[filter,] %>%
-#   distinct(SequenceID, .keep_all = TRUE)
-# 
-# Eukaryota.noKEGG <- Eukaryota.TFA[!filter,] %>%
-#   distinct(SequenceID, .keep_all = TRUE)
-# 
-# filter2 <- Eukaryota.noKEGG$SequenceID %in% Eukaryota.KEGG$SequenceID
-# 
-# Eukaryota.noKEGG <- Eukaryota.noKEGG[!filter2,]
-# 
-# Eukaryota.noRep <- rbind(Eukaryota.KEGG,Eukaryota.noKEGG)
-# 
-# write.csv(Eukaryota.noRep,"CSV_files/Eukaryota.TFA_NoRep.csv",row.names = F)
-# 
-# Eukaryota.noRep$Class <- ifelse(substring(Eukaryota.noRep$Class,nchar(Eukaryota.noRep$Class)-7) == " (Class)",
-#                              substring(Eukaryota.noRep$Class,1,nchar(Eukaryota.noRep$Class)-8),
-#                              Eukaryota.noRep$Class)
-# 
-# names(Eukaryota.numread)[1] <- "SequenceID"
-# 
-# df.merged <- merge(Eukaryota.numread,Eukaryota.noRep,by = "SequenceID")
-# 
-# df.merged$Class[is.na(df.merged$Class)] <- "Unclassified"
-# 
-# write.csv(df.merged,"CSV_files/Eukaryota.merged.csv",row.names = F)
-```
+Eukaryota.numread <- read.csv("CSV_files/Eukaryota.subsection.numreads.csv")
 
-```{r}
-#Raw read
-# Eukaryota.numread <- read.csv("CSV_files/Eukaryota.subsection.numreads.csv")
-# 
-# #Transcripts per million
-# Eukaryota.TPM <- read.csv("CSV_files/Eukaryota.subsection.TPM.csv")
-# 
-# #Taxonomy and functional annotation
-# Eukaryota.TFA <- read.csv("CSV_files/Eukaryota.subsection.TFA.csv")
-# 
-# tax.levels <- c("Domain","Supergroup","Division","Class","Order","Family","Genus","Species")[3:4]
-# n <- length(tax.levels)
-# 
-# for(i in 1:n){
-#   Eukaryota.TFA[,tax.levels[i]] <-
-# }
-# 
-# Eukaryota.TFA$Class <- ifelse(substring(Eukaryota.TFA$Class,nchar(Eukaryota.TFA$Class)-7) == " (Class)",
-#                              substring(Eukaryota.TFA$Class,1,nchar(Eukaryota.TFA$Class)-8),
-#                              Eukaryota.TFA$Class)
-# 
-# names(Eukaryota.numread)[1] <- "SequenceID"
-# 
-# df.merged <- merge(Eukaryota.numread,Eukaryota.TFA,by = "SequenceID")
-# 
-# df.merged$Class[is.na(df.merged$Class)] <- "Unclassified"
-# 
-# write.csv(df.merged,"CSV_files/Eukaryota.merged2.csv",row.names = F)
+#Transcripts per million
+Eukaryota.TPM <- read.csv("CSV_files/Eukaryota.subsection.TPM.csv")
+
+Eukaryota.TFA <- read.csv("CSV_files/Eukaryota.subsection.TFA.csv")
+#Filtering out the sequences present in the Taxonomy and functional annotations data, but not in the numread/TPM
+filter <- Eukaryota.TFA$SequenceID %in% Eukaryota.numread$Name
+
+Eukaryota.TFA <- Eukaryota.TFA[filter,]
+
+#Seperates sequences with a KEGG from the sequences that don't
+filter <- Eukaryota.TFA$KEGG_ko != "-"
+
+Eukaryota.KEGG <- Eukaryota.TFA[filter,]
+Eukaryota.noKEGG <- Eukaryota.TFA[!filter,]
+
+#Creates a filter for the sequences that have KEGGs to seperate COGs and noCOGs
+filter1 <- Eukaryota.KEGG$COG_category == "-"
+
+Eukaryota.KEGG.COG <- Eukaryota.KEGG[!filter1,] %>%
+  distinct(SequenceID, .keep_all = TRUE)
+
+Eukaryota.KEGG.noCOG <- Eukaryota.KEGG[filter1,] %>%
+  distinct(SequenceID, .keep_all = TRUE)
+
+#Removes sequences from noCOG that is present in COG
+filter2 <- Eukaryota.KEGG.noCOG$SequenceID %in% Eukaryota.KEGG.COG$SequenceID
+
+Eukaryota.KEGG <- rbind(Eukaryota.KEGG.COG,Eukaryota.KEGG.noCOG[!filter2,])
+
+#Creates a filter for the sequences that doesn't have KEGGs to seperate COGs and noCOGs
+filter1 <- Eukaryota.noKEGG$COG_category == "-"
+
+Eukaryota.noKEGG.COG <- Eukaryota.noKEGG[!filter1,] %>%
+  distinct(SequenceID, .keep_all = TRUE)
+
+Eukaryota.noKEGG.noCOG <- Eukaryota.noKEGG[filter1,] %>%
+  distinct(SequenceID, .keep_all = TRUE)
+
+#Removes sequences from noCOG that is present in COG
+filter2 <- Eukaryota.noKEGG.noCOG$SequenceID %in% Eukaryota.noKEGG.COG$SequenceID
+
+Eukaryota.noKEGG <- rbind(Eukaryota.noKEGG.COG,Eukaryota.noKEGG.noCOG[!filter2,])
+
+#Filtering Sequences in noKEGG that are present in KEGG
+filter3 <- Eukaryota.noKEGG$SequenceID %in% Eukaryota.KEGG$SequenceID
+
+Eukaryota.noRep <- rbind(Eukaryota.KEGG,Eukaryota.noKEGG[!filter3,])
+
+write.csv(Eukaryota.noRep,"CSV_files/Eukaryota.TFA_NoRep.csv",row.names = F)
+
+Eukaryota.noRep$Class <- ifelse(substring(Eukaryota.noRep$Class,nchar(Eukaryota.noRep$Class)-7) == " (Class)",
+                             substring(Eukaryota.noRep$Class,1,nchar(Eukaryota.noRep$Class)-8),
+                             Eukaryota.noRep$Class)
+
+names(Eukaryota.numread)[1] <- "SequenceID"
+
+df.merged <- merge(Eukaryota.numread,Eukaryota.noRep,by = "SequenceID")
+
+df.merged$Class[is.na(df.merged$Class)] <- "Unclassified"
+
+write.csv(df.merged,"CSV_files/Eukaryota.merged.csv",row.names = F)
 ```
 
 ```{r}
@@ -168,26 +163,12 @@ tz = "America/Santiago")
 
 partime$norm.par <- partime$par / max(partime$par)
 
-partime %>% ggplot(aes(x = lubri, 
-                       y= 1,
-                       colour = par))+
-  geom_line()+
-  scale_color_gradient(low = "blue",high = "red")
-
-
-# df.test <- data.frame(cbind(x = rep(1,10), y = 1:10))
-# 
-# p4 <- ggplot(df.test)+
-#   geom_tile(aes(x = y , y = x, fill = y),
-#            stat = "identity")
-# 
-# p4
-
 m <- 1
-time.int <- ms("01.00")
+time.int <- ms("59.59")
 for(i in 1:nrow(partime)){
   if(i == 1){
     vec <- NA
+    vec.slide <- NA
     n <- 1
   }
   
@@ -197,6 +178,7 @@ for(i in 1:nrow(partime)){
     m <- i
     
     vec[n] <- i
+    
     n <- n+1
   }
   
@@ -207,15 +189,38 @@ data.length <- vec
 dfOut <- partime[data.length,]
 
 p5 <- ggplot(dfOut)+
-  geom_tile(aes(x = lubri,y = 0.5, fill = par),
+  geom_tile(aes(x = lubri,
+                y = 0.5,
+                fill = par),
            stat = "identity")+
-  scale_fill_gradient(low = "black",high = "yellow")+
-  theme_minimal()+
-  geom_line(aes(x = lubri,y = norm.par,color = "red"))
+  scale_fill_gradient(low = "darkgrey",
+                      high = "yellow")+
+  geom_line(aes(x = lubri,
+                y = norm.par,
+                color = "red"),
+                linewidth = 0.5)+
+  #scale_x_continuous()+
+  theme_classic(base_size = 16)+
+  theme(legend.title=element_blank(),
+        legend.position = "right",
+        legend.key.size = unit(1.5, "cm"),
+        axis.text = element_text(colour = "black"),
+        axis.ticks = element_line(colour = "black"),
+        panel.border = element_rect(linewidth = 1,
+                                    colour = "black",
+                                    fill = NA),
+        strip.background.x =  element_rect(colour = NA,
+                                           fill = NA),
+        strip.text.x = element_text(face = "bold",
+                                    size = 20),
+        strip.text.y = element_text(face = "bold",
+                                    size = 15))+
+  guides(colour = guide_legend(nrow = 3),
+         shape = "none")
 
 p5
 
-partime2 <- dfOut
+ggsave("LI_tile_plot.png", p5, width = 16, height = 9,dpi = 600)
 
 ```
 
@@ -440,7 +445,7 @@ p2
 ```{r}
 
 m <- 1
-time.int <- ms("00.30")
+time.int <- ms("05.00")
 for(i in 1:nrow(partime)){
   if(i == 1){
     vec <- NA
@@ -527,4 +532,6 @@ ggsave("Test_plot.png",p3,width = 10,height = 6,dpi = 300)
 ```
 
 Z-scale
+
+
 
