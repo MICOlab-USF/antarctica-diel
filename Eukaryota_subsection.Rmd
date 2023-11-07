@@ -81,69 +81,69 @@ Eukaryota.merged <- read.csv("CSV_files/Eukaryota.merged.csv")
 #Reading the Eukaryota numread and TPM subsectioned files.####
 
 #Raw read
-Eukaryota.numread <- read.csv("CSV_files/Eukaryota.subsection.numreads.csv")
-
-#Transcripts per million
-Eukaryota.TPM <- read.csv("CSV_files/Eukaryota.subsection.TPM.csv")
-
-Eukaryota.TFA <- read.csv("CSV_files/Eukaryota.subsection.TFA.csv")
-#Filtering out the sequences present in the Taxonomy and functional annotations data, but not in the numread/TPM
-filter <- Eukaryota.TFA$SequenceID %in% Eukaryota.numread$Name
-
-Eukaryota.TFA <- Eukaryota.TFA[filter,]
-
-#Seperates sequences with a KEGG from the sequences that don't
-filter <- Eukaryota.TFA$KEGG_ko != "-"
-
-Eukaryota.KEGG <- Eukaryota.TFA[filter,]
-Eukaryota.noKEGG <- Eukaryota.TFA[!filter,]
-
-#Creates a filter for the sequences that have KEGGs to seperate COGs and noCOGs
-filter1 <- Eukaryota.KEGG$COG_category == "-"
-
-Eukaryota.KEGG.COG <- Eukaryota.KEGG[!filter1,] %>%
-  distinct(SequenceID, .keep_all = TRUE)
-
-Eukaryota.KEGG.noCOG <- Eukaryota.KEGG[filter1,] %>%
-  distinct(SequenceID, .keep_all = TRUE)
-
-#Removes sequences from noCOG that is present in COG
-filter2 <- Eukaryota.KEGG.noCOG$SequenceID %in% Eukaryota.KEGG.COG$SequenceID
-
-Eukaryota.KEGG <- rbind(Eukaryota.KEGG.COG,Eukaryota.KEGG.noCOG[!filter2,])
-
-#Creates a filter for the sequences that doesn't have KEGGs to seperate COGs and noCOGs
-filter1 <- Eukaryota.noKEGG$COG_category == "-"
-
-Eukaryota.noKEGG.COG <- Eukaryota.noKEGG[!filter1,] %>%
-  distinct(SequenceID, .keep_all = TRUE)
-
-Eukaryota.noKEGG.noCOG <- Eukaryota.noKEGG[filter1,] %>%
-  distinct(SequenceID, .keep_all = TRUE)
-
-#Removes sequences from noCOG that is present in COG
-filter2 <- Eukaryota.noKEGG.noCOG$SequenceID %in% Eukaryota.noKEGG.COG$SequenceID
-
-Eukaryota.noKEGG <- rbind(Eukaryota.noKEGG.COG,Eukaryota.noKEGG.noCOG[!filter2,])
-
-#Filtering Sequences in noKEGG that are present in KEGG
-filter3 <- Eukaryota.noKEGG$SequenceID %in% Eukaryota.KEGG$SequenceID
-
-Eukaryota.noRep <- rbind(Eukaryota.KEGG,Eukaryota.noKEGG[!filter3,])
-
-write.csv(Eukaryota.noRep,"CSV_files/Eukaryota.TFA_NoRep.csv",row.names = F)
-
-Eukaryota.noRep$Class <- ifelse(substring(Eukaryota.noRep$Class,nchar(Eukaryota.noRep$Class)-7) == " (Class)",
-                             substring(Eukaryota.noRep$Class,1,nchar(Eukaryota.noRep$Class)-8),
-                             Eukaryota.noRep$Class)
-
-names(Eukaryota.numread)[1] <- "SequenceID"
-
-df.merged <- merge(Eukaryota.numread,Eukaryota.noRep,by = "SequenceID")
-
-df.merged$Class[is.na(df.merged$Class)] <- "Unclassified"
-
-write.csv(df.merged,"CSV_files/Eukaryota.merged.csv",row.names = F)
+# Eukaryota.numread <- read.csv("CSV_files/Eukaryota.subsection.numreads.csv")
+# 
+# #Transcripts per million
+# Eukaryota.TPM <- read.csv("CSV_files/Eukaryota.subsection.TPM.csv")
+# 
+# Eukaryota.TFA <- read.csv("CSV_files/Eukaryota.subsection.TFA.csv")
+# #Filtering out the sequences present in the Taxonomy and functional annotations data, but not in the numread/TPM
+# filter <- Eukaryota.TFA$SequenceID %in% Eukaryota.numread$Name
+# 
+# Eukaryota.TFA <- Eukaryota.TFA[filter,]
+# 
+# #Seperates sequences with a KEGG from the sequences that don't
+# filter <- Eukaryota.TFA$KEGG_ko != "-"
+# 
+# Eukaryota.KEGG <- Eukaryota.TFA[filter,]
+# Eukaryota.noKEGG <- Eukaryota.TFA[!filter,]
+# 
+# #Creates a filter for the sequences that have KEGGs to seperate COGs and noCOGs
+# filter1 <- Eukaryota.KEGG$COG_category == "-"
+# 
+# Eukaryota.KEGG.COG <- Eukaryota.KEGG[!filter1,] %>%
+#   distinct(SequenceID, .keep_all = TRUE)
+# 
+# Eukaryota.KEGG.noCOG <- Eukaryota.KEGG[filter1,] %>%
+#   distinct(SequenceID, .keep_all = TRUE)
+# 
+# #Removes sequences from noCOG that is present in COG
+# filter2 <- Eukaryota.KEGG.noCOG$SequenceID %in% Eukaryota.KEGG.COG$SequenceID
+# 
+# Eukaryota.KEGG <- rbind(Eukaryota.KEGG.COG,Eukaryota.KEGG.noCOG[!filter2,])
+# 
+# #Creates a filter for the sequences that doesn't have KEGGs to seperate COGs and noCOGs
+# filter1 <- Eukaryota.noKEGG$COG_category == "-"
+# 
+# Eukaryota.noKEGG.COG <- Eukaryota.noKEGG[!filter1,] %>%
+#   distinct(SequenceID, .keep_all = TRUE)
+# 
+# Eukaryota.noKEGG.noCOG <- Eukaryota.noKEGG[filter1,] %>%
+#   distinct(SequenceID, .keep_all = TRUE)
+# 
+# #Removes sequences from noCOG that is present in COG
+# filter2 <- Eukaryota.noKEGG.noCOG$SequenceID %in% Eukaryota.noKEGG.COG$SequenceID
+# 
+# Eukaryota.noKEGG <- rbind(Eukaryota.noKEGG.COG,Eukaryota.noKEGG.noCOG[!filter2,])
+# 
+# #Filtering Sequences in noKEGG that are present in KEGG
+# filter3 <- Eukaryota.noKEGG$SequenceID %in% Eukaryota.KEGG$SequenceID
+# 
+# Eukaryota.noRep <- rbind(Eukaryota.KEGG,Eukaryota.noKEGG[!filter3,])
+# 
+# write.csv(Eukaryota.noRep,"CSV_files/Eukaryota.TFA_NoRep.csv",row.names = F)
+# 
+# Eukaryota.noRep$Class <- ifelse(substring(Eukaryota.noRep$Class,nchar(Eukaryota.noRep$Class)-7) == " (Class)",
+#                              substring(Eukaryota.noRep$Class,1,nchar(Eukaryota.noRep$Class)-8),
+#                              Eukaryota.noRep$Class)
+# 
+# names(Eukaryota.numread)[1] <- "SequenceID"
+# 
+# df.merged <- merge(Eukaryota.numread,Eukaryota.noRep,by = "SequenceID")
+# 
+# df.merged$Class[is.na(df.merged$Class)] <- "Unclassified"
+# 
+# write.csv(df.merged,"CSV_files/Eukaryota.merged.csv",row.names = F)
 ```
 
 ```{r}
@@ -164,7 +164,7 @@ tz = "America/Santiago")
 partime$norm.par <- partime$par / max(partime$par)
 
 m <- 1
-time.int <- ms("59.59")
+time.int <- ms("05.00")
 for(i in 1:nrow(partime)){
   if(i == 1){
     vec <- NA
