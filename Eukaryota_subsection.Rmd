@@ -580,12 +580,12 @@ p3 <- ggplot(dfOut2)+
         axis.title.y.right = element_blank(),
         axis.text.y.right = element_blank(),
         axis.ticks.y.right = element_blank(),
-        strip.text.x = element_text(size = 6))+
+        strip.text.x = element_text(size = 10))+
   guides(fill = guide_legend(title = "Class"))
 
 p3
 
-ggsave("Class_light_plot.png",width = 10,height = 6,dpi = 300)
+ggsave("COG_Class_plots/Class_light_plot.png",width = 10,height = 9,dpi = 300)
 ```
 
 Z-scale
@@ -748,9 +748,9 @@ p4 <- ggplot(dfOut2)+
              ncol = 5,
              scales = "free_y",
              labeller = function(variable,value){return(name_vec[value])})+
-  scale_y_continuous(label = function(y){y*1000})+
+  scale_y_continuous(label = function(y){y*100})+
   labs(title = "Relative numread of each COG category for full data-set",
-       y = expression(paste("Relative numread (10"^-3,")",sep = "",)),
+       y = expression(paste("Relative numread (%)",sep = "",)),
        x = "Day and time of sampling")+
   theme_classic()+
   theme(axis.text.x = element_text(angle = 90,
