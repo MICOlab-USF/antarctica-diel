@@ -33,7 +33,7 @@ names(meta.data2)[names(meta.data2) == "Sample_ID"] <- "SampleID"
 meta.data <- merge(meta.data1,meta.data2,by = "SampleID") %>% 
   mutate(datetime = ymd(substring(lubri,1,10))+hms(substring(lubri,12,19)))
 
-COG_categories <- read.csv("CSV_files/COG_categories.csv",sep = ";")
+COG_categories <- read.csv("CSV_files/COG_categories.csv",sep = ",")
 
 Eukaryota.merged <- read.csv("CSV_files/Eukaryota.merged.csv")
 
@@ -833,119 +833,131 @@ ggsave("COG_Class_plots/COG_light_plot.png",width = 15,height = 9,dpi = 300)
 ```
 
 ```{r}
-df.merged <- Eukaryota.merged
-
 top5.class <- c("Dinophyceae",
                 "Prymnesiophyceae",
                 "Bacillariophyta",
                 "Cryptophyceae",
                 "Dictyochophyceae")
 
-Class.plot <- top5.class[1]
-filter1 <- df.merged$Class == Class.plot
+Class.plot <- top5.class[1:5]
 
-df.merged <- df.merged[filter1,]
-
-filter <- nchar(df.merged$COG_category) == 1
-df.merged_1COG <- df.merged[filter,] %>% 
-  mutate(COG.untangled = df.merged$COG_category[filter],
-         COG_level = "COG1")
-
-df.merged_nCOG <- df.merged[!filter,] %>% 
-  mutate(COG.untangled = NA)
-
-for(i in 2:max(nchar(df.merged_nCOG$COG_category))){
-  filter <- nchar(df.merged_nCOG$COG_category) == i
+for(l in 1:length(Class.plot)){
   
-  df.temp <- df.merged_nCOG[filter,]
+  df.merged <- Eukaryota.merged
   
-  for(j in 1:i){
-    for(k in 1:nrow(df.temp)){
-      df.temp$COG.untangled[k] <- substring(df.temp$COG_category[k],j,j)
+  filter1 <- df.merged$Class == Class.plot[l]
+
+  df.merged <- df.merged[filter1,]
+  
+  filter <- nchar(df.merged$COG_category) == 1
+  df.merged_1COG <- df.merged[filter,] %>% 
+    mutate(COG.untangled = df.merged$COG_category[filter],
+           COG_level = "COG1")
+  
+  df.merged_nCOG <- df.merged[!filter,] %>% 
+    mutate(COG.untangled = NA)
+  
+  for(i in 2:max(nchar(df.merged_nCOG$COG_category))){
+    filter <- nchar(df.merged_nCOG$COG_category) == i
+    
+    df.temp <- df.merged_nCOG[filter,]
+    
+    for(j in 1:i){
+      for(k in 1:nrow(df.temp)){
+        df.temp$COG.untangled[k] <- substring(df.temp$COG_category[k],j,j)
+      }
+      
+      df.temp <- df.temp %>% 
+        mutate(COG_level = paste("COG",j,sep = ""))
+      
+      if(i == 2 & j == 1){
+        df.untangled <- df.temp
+      }else{
+        df.untangled <- rbind(df.untangled,df.temp)
+      }
     }
     
-    df.temp <- df.temp %>% 
-      mutate(COG_level = paste("COG",j,sep = ""))
-    
-    if(i == 2 & j == 1){
-      df.untangled <- df.temp
-    }else{
-      df.untangled <- rbind(df.untangled,df.temp)
+    if(i == max(nchar(df.merged_nCOG$COG_category))){
+      df.merged <- rbind(df.merged_1COG,df.untangled)
     }
   }
   
-  if(i == max(nchar(df.merged_nCOG$COG_category))){
-    df.merged <- rbind(df.merged_1COG,df.untangled)
-  }
-}
-
-COG.vec <- unique(df.merged$COG.untangled)
-n <- length(COG.vec)
-
-day.vec <- paste(meta.data$SampleID,"_quant",sep = "")
-m <- length(day.vec)
-
-for(i in 1:n){ #Looping through the Classes to count the occurrences.
+  COG.vec <- unique(df.merged$COG.untangled)
+  n <- length(COG.vec)
   
-  COG.filter <- df.merged$COG.untangled == COG.vec[i]
-  df.temp <- df.merged[COG.filter,]
+  day.vec <- paste(meta.data$SampleID,"_quant",sep = "")
+  m <- length(day.vec)
   
-  for(j in 1:m){ #Looping through the sampling time points.
+  for(i in 1:n){ #Looping through the Classes to count the occurrences.
     
-   if(i == 1 & j == 1){ #Sets up an empty data.frame to input the data
-     
-     df.count <- data.frame(matrix(ncol = m, nrow = n))
-     names(df.count) <- meta.data$SampleName
-     
-     df.count <- cbind(df.count,COG.vec)
-   }
+    COG.filter <- df.merged$COG.untangled == COG.vec[i]
+    df.temp <- df.merged[COG.filter,]
     
-    df.count[i,j] <- sum(df.temp[,day.vec[j]])/sum(df.merged[,day.vec[j]])
-    
+    for(j in 1:m){ #Looping through the sampling time points.
+      
+     if(i == 1 & j == 1){ #Sets up an empty data.frame to input the data
+       
+       df.count <- data.frame(matrix(ncol = m, nrow = n))
+       names(df.count) <- meta.data$SampleName
+       
+       df.count <- cbind(df.count,COG.vec)
+     }
+      
+      df.count[i,j] <- sum(df.temp[,day.vec[j]])/sum(df.merged[,day.vec[j]])
+      
+    }
   }
+  
+  df.merged2 <- df.merged[df.merged$COG.untangled != "-",]
+  
+  top5.vec <- names(table(df.merged2$COG.untangled)[order(-table(df.merged2$COG.untangled))[1:24]])
+  
+  top5.filter <- df.count$COG.vec %in% c(top5.vec)
+  
+  df.top5 <- df.count[top5.filter,]
+  df.other <- df.count[!top5.filter,]
+  
+  df.count2 <- rbind(df.top5,c(colSums(df.other[,1:24]),"Other"))
+  
+  order.vec <- c("Day1_afternoon",
+                 "Day1_evening",
+                 "Day1_night",
+                 "Day1_morning",
+                 "Day2_night",
+                 "Day2_morning",
+                 "Day2_afternoon",
+                 "Day2_evening")
+  
+  name_vec <- COG_categories$Description
+  
+  names(name_vec) <- COG_categories$Category
+  
+  dfOut <- pivot_longer(df.count2,
+                        all_of(meta.data$SampleName),
+                        names_to = "Day",
+                        values_to = "Count") %>% 
+    mutate(Count = as.numeric(Count))
+  
+  dfOut$Day <- substring(dfOut$Day,1,nchar(dfOut$Day)-1)
+  
+  df.summ <- summarySE(data = dfOut, "Count",
+                       groupvars = c("Day","COG.vec"))
+  
+  Day.Time <- meta.data[,c("AssemblyGroup","datetime")] %>% 
+    distinct(AssemblyGroup, .keep_all = TRUE)
+  
+  names(Day.Time)[names(Day.Time) == "AssemblyGroup"] <- "Day"
+  
+  dfOut.temp <- merge(df.summ,Day.Time,by = "Day") %>% 
+    mutate(Class = Class.plot[l])
+  
+  if(l == 1){
+    dfOut2 <- dfOut.temp
+  } else {
+    dfOut2 <- rbind(dfOut2,dfOut.temp)
+  }
+  
 }
-
-df.merged2 <- df.merged[df.merged$COG.untangled != "-",]
-
-top5.vec <- names(table(df.merged2$COG.untangled)[order(-table(df.merged2$COG.untangled))[1:24]])
-
-top5.filter <- df.count$COG.vec %in% c(top5.vec)
-
-df.top5 <- df.count[top5.filter,]
-df.other <- df.count[!top5.filter,]
-
-df.count2 <- rbind(df.top5,c(colSums(df.other[,1:24]),"Other"))
-
-order.vec <- c("Day1_afternoon",
-               "Day1_evening",
-               "Day1_night",
-               "Day1_morning",
-               "Day2_night",
-               "Day2_morning",
-               "Day2_afternoon",
-               "Day2_evening")
-
-name_vec <- COG_categories$Description
-
-names(name_vec) <- COG_categories$Category
-
-dfOut <- pivot_longer(df.count2,
-                      all_of(meta.data$SampleName),
-                      names_to = "Day",
-                      values_to = "Count") %>% 
-  mutate(Count = as.numeric(Count))
-
-dfOut$Day <- substring(dfOut$Day,1,nchar(dfOut$Day)-1)
-
-df.summ <- summarySE(data = dfOut, "Count",
-                     groupvars = c("Day","COG.vec"))
-
-Day.Time <- meta.data[,c("AssemblyGroup","datetime")] %>% 
-  distinct(AssemblyGroup, .keep_all = TRUE)
-
-names(Day.Time)[names(Day.Time) == "AssemblyGroup"] <- "Day"
-
-dfOut2 <- merge(df.summ,Day.Time,by = "Day") #%>% mutate(COG.vec = factor(COG.vec, labels = name_vec))
 
 partime$norm.par <- (partime$par / max(partime$par))*.03
 
@@ -988,10 +1000,10 @@ p6 <- ggplot(dfOut2)+
   scale_fill_gradient(low = "black",high = "yellow")+
   geom_line(aes(y = Count,
                 x = datetime,
-                color = COG.vec))+
+                color = Class))+
   geom_point(aes(y = Count,
                  x = datetime,
-                 color = COG.vec))+
+                 color = Class))+
   geom_errorbar(aes(y = Count,
                     x = datetime,
                     ymin = Count+sd,
@@ -1002,24 +1014,25 @@ p6 <- ggplot(dfOut2)+
              scales = "free_y",
              labeller = function(variable,value){return(name_vec[value])})+
   scale_y_continuous(label = function(y){y*100})+
-  labs(title = paste("Relative TPM of each COG category for ",Class.plot,sep = ""),
+  labs(title = paste("Relative TPM of each COG category for Top5 Classes",sep = ""),
        y = expression(paste("Relative TPM (%)",sep = "",)),
        x = "Day and time of sampling")+
   theme_classic()+
   theme(axis.text.x = element_text(angle = 90,
                                    vjust = 0.5,
                                    hjust=1),
-        legend.position = "none",
+        legend.position = "right",
         axis.line.y.right = element_blank(),
         axis.title.y.right = element_blank(),
         axis.text.y.right = element_blank(),
         axis.ticks.y.right = element_blank(),
         strip.text.x = element_text(size = 6))+
-  guides(fill = guide_legend(title = "COG"))
+  guides(fill = "none",
+         alpha = "none")
 
 p6
 
-save.name <- paste("COG_Class_plots/",Class.plot,"COG_light_plot.png",sep = "")
+save.name <- paste("COG_Class_plots/Top5_COG_light_plot2.png",sep = "")
 
 ggsave(save.name,width = 15,height = 9,dpi = 300)
 ```
