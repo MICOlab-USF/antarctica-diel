@@ -48,6 +48,29 @@ partime <- par %>% separate(juliendatetime, c("yearday","hour", "min", "sec"), s
 
 partime$lubri <- with_tz(mdy_hms(partime$utcdatetime, tz = "UTC"),
 tz = "America/Santiago")
+
+m <- 1
+time.int <- ms("05.00")
+for(i in 1:nrow(partime)){
+  if(i == 1){
+    vec <- NA
+    vec.slide <- NA
+    n <- 1
+  }
+  
+  test.vec <- partime$lubri[i] - partime$lubri[m]
+  
+  if(test.vec > time.int){
+    m <- i
+    
+    vec[n] <- i
+    
+    n <- n+1
+  }
+  
+}
+
+partime <- partime[vec,]
 ```
 
 
@@ -78,27 +101,24 @@ tz = "America/Santiago")
 
 # Eukaryota <- read.csv("CSV_files/Eukaryota.subsection.TFA.csv")
 # 
-# salmon.TPM <- read.csv("CSV_files/salmon.merged.TPM.subset5.csv")
-# 
 # salmon.numread <- read.csv("CSV_files/salmon.merged.numreads.subset5.csv")
 # filter <- salmon.numread$Name %in% Eukaryota$SequenceID
 # 
 # Eukaryota.numread <- salmon.numread[filter,]
 # write.csv(Eukaryota.numread,"CSV_files/Eukaryota.subsection.numreads.csv",row.names = F)
 # 
+# salmon.TPM <- read.csv("CSV_files/salmon.merged.TPM.subset5.csv")
+# filter <- salmon.TPM$Name %in% Eukaryota$SequenceID
+# 
 # Eukaryota.TPM <- salmon.TPM[filter,]
 # write.csv(Eukaryota.TPM, "CSV_files/Eukaryota.subsection.TPM.csv",row.names = F)
 ```
 
 
-```{r}
-#Reading the Eukaryota numread and TPM subsectioned files.####
+```{r Numread merge}
 
 #Raw read
 # Eukaryota.numread <- read.csv("CSV_files/Eukaryota.subsection.numreads.csv")
-# 
-# #Transcripts per million
-# Eukaryota.TPM <- read.csv("CSV_files/Eukaryota.subsection.TPM.csv")
 # 
 # Eukaryota.TFA <- read.csv("CSV_files/Eukaryota.subsection.TFA.csv")
 # #Filtering out the sequences present in the Taxonomy and functional annotations data, but not in the numread/TPM
@@ -160,34 +180,77 @@ tz = "America/Santiago")
 # write.csv(df.merged,"CSV_files/Eukaryota.merged.csv",row.names = F)
 ```
 
+```{r TPM merge}
+
+#Transcripts per million
+# Eukaryota.TPM <- read.csv("CSV_files/Eukaryota.subsection.TPM.csv")
+# 
+# Eukaryota.TFA <- read.csv("CSV_files/Eukaryota.subsection.TFA.csv")
+# 
+# #Filtering out the sequences present in the Taxonomy and functional annotations data, but not in the TPM
+# filter <- Eukaryota.TFA$SequenceID %in% Eukaryota.TPM$Name
+# 
+# Eukaryota.TFA <- Eukaryota.TFA[filter,]
+# 
+# #Seperates sequences with a KEGG from the sequences that don't
+# filter <- Eukaryota.TFA$KEGG_ko != "-"
+# 
+# Eukaryota.KEGG <- Eukaryota.TFA[filter,]
+# Eukaryota.noKEGG <- Eukaryota.TFA[!filter,]
+# 
+# #Creates a filter for the sequences that have KEGGs to seperate COGs and noCOGs
+# filter1 <- Eukaryota.KEGG$COG_category == "-"
+# 
+# Eukaryota.KEGG.COG <- Eukaryota.KEGG[!filter1,] %>%
+#   distinct(SequenceID, .keep_all = TRUE)
+# 
+# Eukaryota.KEGG.noCOG <- Eukaryota.KEGG[filter1,] %>%
+#   distinct(SequenceID, .keep_all = TRUE)
+# 
+# #Removes sequences from noCOG that is present in COG
+# filter2 <- Eukaryota.KEGG.noCOG$SequenceID %in% Eukaryota.KEGG.COG$SequenceID
+# 
+# Eukaryota.KEGG <- rbind(Eukaryota.KEGG.COG,Eukaryota.KEGG.noCOG[!filter2,])
+# 
+# #Creates a filter for the sequences that doesn't have KEGGs to seperate COGs and noCOGs
+# filter1 <- Eukaryota.noKEGG$COG_category == "-"
+# 
+# Eukaryota.noKEGG.COG <- Eukaryota.noKEGG[!filter1,] %>%
+#   distinct(SequenceID, .keep_all = TRUE)
+# 
+# Eukaryota.noKEGG.noCOG <- Eukaryota.noKEGG[filter1,] %>%
+#   distinct(SequenceID, .keep_all = TRUE)
+# 
+# #Removes sequences from noCOG that is present in COG
+# filter2 <- Eukaryota.noKEGG.noCOG$SequenceID %in% Eukaryota.noKEGG.COG$SequenceID
+# 
+# Eukaryota.noKEGG <- rbind(Eukaryota.noKEGG.COG,Eukaryota.noKEGG.noCOG[!filter2,])
+# 
+# #Filtering Sequences in noKEGG that are present in KEGG
+# filter3 <- Eukaryota.noKEGG$SequenceID %in% Eukaryota.KEGG$SequenceID
+# 
+# Eukaryota.noRep <- rbind(Eukaryota.KEGG,Eukaryota.noKEGG[!filter3,])
+# 
+# write.csv(Eukaryota.noRep,"CSV_files/Eukaryota.TFA_NoRep.csv",row.names = F)
+# 
+# Eukaryota.noRep$Class <- ifelse(substring(Eukaryota.noRep$Class,nchar(Eukaryota.noRep$Class)-7) == " (Class)",
+#                              substring(Eukaryota.noRep$Class,1,nchar(Eukaryota.noRep$Class)-8),
+#                              Eukaryota.noRep$Class)
+# 
+# names(Eukaryota.TPM)[1] <- "SequenceID"
+# 
+# df.merged <- merge(Eukaryota.TPM,Eukaryota.noRep,by = "SequenceID")
+# 
+# df.merged$Class[is.na(df.merged$Class)] <- "Unclassified"
+# 
+# write.csv(df.merged,"CSV_files/Eukaryota.merged.csv",row.names = F)
+```
+
 ```{r}
 
 partime$norm.par <- partime$par / max(partime$par)
 
-m <- 1
-time.int <- ms("05.00")
-for(i in 1:nrow(partime)){
-  if(i == 1){
-    vec <- NA
-    vec.slide <- NA
-    n <- 1
-  }
-  
-  test.vec <- partime$lubri[i] - partime$lubri[m]
-  
-  if(test.vec > time.int){
-    m <- i
-    
-    vec[n] <- i
-    
-    n <- n+1
-  }
-  
-}
-
-data.length <- vec
-
-dfOut <- partime[data.length,]
+dfOut <- partime
 
 p5 <- ggplot(dfOut)+
   geom_tile(aes(x = lubri,
@@ -514,7 +577,7 @@ names(Day.Time)[names(Day.Time) == "AssemblyGroup"] <- "Day"
 
 dfOut2 <- merge(df.summ,Day.Time,by = "Day")
 
-partime2 <- partime[vec,]
+partime2 <- partime
 
 filter <- partime2$lubri < min(dfOut2$datetime)
 
@@ -568,8 +631,8 @@ p3 <- ggplot(dfOut2)+
   scale_x_continuous(breaks = unique(meta.data$datetime),
                      labels = unique(meta.data$AssemblyGroup))+
   scale_y_continuous(label = function(y){y*100})+
-  labs(title = "Relative numreads per day",
-       y = "numreads per class / total numreads per day (%)",
+  labs(title = "Relative TPM per day",
+       y = "TPM per class / total TPM per day (%)",
        x = "Time of sample")+
   theme_classic()+
   theme(axis.text.x = element_text(angle = 90,
@@ -696,7 +759,7 @@ dfOut2 <- merge(df.summ,Day.Time,by = "Day") #%>% mutate(COG.vec = factor(COG.ve
 
 partime$norm.par <- (partime$par / max(partime$par))*.03
 
-partime2 <- partime[vec,]
+partime2 <- partime
 
 filter <- partime2$lubri < min(dfOut2$datetime)
 
@@ -749,8 +812,8 @@ p4 <- ggplot(dfOut2)+
              scales = "free_y",
              labeller = function(variable,value){return(name_vec[value])})+
   scale_y_continuous(label = function(y){y*100})+
-  labs(title = "Relative numread of each COG category for full data-set",
-       y = expression(paste("Relative numread (%)",sep = "",)),
+  labs(title = "Relative TPM of each COG category for full data-set",
+       y = expression(paste("Relative TPM (%)",sep = "",)),
        x = "Day and time of sampling")+
   theme_classic()+
   theme(axis.text.x = element_text(angle = 90,
@@ -766,13 +829,19 @@ p4 <- ggplot(dfOut2)+
 
 p4
 
-ggsave("COG_light_plot.png",width = 15,height = 9,dpi = 300)
+ggsave("COG_Class_plots/COG_light_plot.png",width = 15,height = 9,dpi = 300)
 ```
 
 ```{r}
 df.merged <- Eukaryota.merged
 
-Class.plot <- "Dinophyceae"
+top5.class <- c("Dinophyceae",
+                "Prymnesiophyceae",
+                "Bacillariophyta",
+                "Cryptophyceae",
+                "Dictyochophyceae")
+
+Class.plot <- top5.class[1]
 filter1 <- df.merged$Class == Class.plot
 
 df.merged <- df.merged[filter1,]
@@ -880,7 +949,7 @@ dfOut2 <- merge(df.summ,Day.Time,by = "Day") #%>% mutate(COG.vec = factor(COG.ve
 
 partime$norm.par <- (partime$par / max(partime$par))*.03
 
-partime2 <- partime[vec,]
+partime2 <- partime
 
 filter <- partime2$lubri < min(dfOut2$datetime)
 
@@ -933,8 +1002,8 @@ p6 <- ggplot(dfOut2)+
              scales = "free_y",
              labeller = function(variable,value){return(name_vec[value])})+
   scale_y_continuous(label = function(y){y*100})+
-  labs(title = paste("Relative numread of each COG category for ",Class.plot,sep = ""),
-       y = expression(paste("Relative numread (%)",sep = "",)),
+  labs(title = paste("Relative TPM of each COG category for ",Class.plot,sep = ""),
+       y = expression(paste("Relative TPM (%)",sep = "",)),
        x = "Day and time of sampling")+
   theme_classic()+
   theme(axis.text.x = element_text(angle = 90,
@@ -950,7 +1019,7 @@ p6 <- ggplot(dfOut2)+
 
 p6
 
-save.name <- paste(Class.plot,"COG_light_plot.png",sep = "")
+save.name <- paste("COG_Class_plots/",Class.plot,"COG_light_plot.png",sep = "")
 
 ggsave(save.name,width = 15,height = 9,dpi = 300)
 ```
