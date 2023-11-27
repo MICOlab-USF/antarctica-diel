@@ -33,8 +33,8 @@ names(meta.data2)[names(meta.data2) == "Sample_ID"] <- "SampleID"
 meta.data <- merge(meta.data1,meta.data2,by = "SampleID") %>% 
   mutate(datetime = ymd(substring(lubri,1,10))+hms(substring(lubri,12,19)))
 
-meta.data$lubri <- with_tz(mdy_hms(meta.data$datetime, tz = "UTC"),
-                           tz = "America/Santiago")
+# meta.data$lubri <- with_tz(mdy_hms(meta.data$datetime, tz = "UTC"),
+#                            tz = "America/Santiago")
 
 COG_categories <- read.csv("CSV_files/COG_categories.csv",sep = ",")
 
@@ -54,6 +54,18 @@ partime <- par %>%
 
 partime$lubri <- with_tz(mdy_hms(partime$utcdatetime, tz = "UTC"),
                          tz = "America/Santiago")
+
+for(i in 1:nrow(meta.data)){
+
+  filter.above <- partime$lubri >= meta.data$datetime[i]
+  filter.below <- partime$lubri < meta.data$datetime[i]
+  
+  vec.above <- partime[partime$lubri == min(partime$lubri[filter.above]),]
+  vec.below <- partime[partime$lubri == max(partime$lubri[filter.below]),]
+  
+  meta.data$par[i] <- mean(vec.above$par,vec.below$par)
+  
+}
 
 m <- 1
 time.int <- ms("05.00")
@@ -290,7 +302,7 @@ p5 <- ggplot(dfOut)+
 
 p5
 
-ggsave("LI_tile_plot.png", p5, width = 16, height = 9,dpi = 600)
+# ggsave("LI_tile_plot.png", p5, width = 16, height = 9,dpi = 600)
 
 ```
 
