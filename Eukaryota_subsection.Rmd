@@ -1054,6 +1054,7 @@ save.name <- paste("COG_Class_plots/Top5_COG_light_plot.png",sep = "")
 
 ggsave(save.name,width = 15,height = 9,dpi = 300)
 ```
+Group by hour of day instead of seperating the data as two days
 
 ```{r}
 df.merged <- Eukaryota.merged
@@ -1178,6 +1179,7 @@ p7 <- ggplot(dfOut2)+
              scales = "free_y",
              labeller = function(variable,value){return(name_vec[value])})+
   scale_y_continuous(label = function(y){y*100})+
+  scale_x_continuous(limits = c(0,0.015))+
   labs(title = "Relative TPM of each COG category for full data-set",
        y = expression(paste("Relative TPM (%)",sep = "",)),
        x = expression(paste("par (µmol photons m"^-2," s"^-1,")",sep = "")))+
@@ -1195,7 +1197,7 @@ p7 <- ggplot(dfOut2)+
 
 p7
 
-ggsave("COG_Class_plots/COG_v_light_plot.png",width = 15,height = 9,dpi = 300)
+ggsave("COG_Class_plots/COG_v_light_plot2.png",width = 15,height = 9,dpi = 300)
 ```
 
 
