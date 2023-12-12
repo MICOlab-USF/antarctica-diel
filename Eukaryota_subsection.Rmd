@@ -24,14 +24,20 @@ library(vegan)
 library(Rmisc)
 library(lubridate)
 
+#Loading the meta.data: meta.data1 is the Assmebly group and the sequencing ID (sample ID),
+#meta.data2 is the data about sampling time and site.
+
 meta.data1 <- read.csv("CSV_files/dielRNA_eukrythmic.tsv", sep = "\t")
 meta.data2 <- read.csv("sample_metadata.csv") %>% 
   mutate(Sample_ID = paste("HM",Sample_ID,sep = ""))
 
 names(meta.data2)[names(meta.data2) == "Sample_ID"] <- "SampleID"
 
+#Combining meta.data1 and meta.data2 and making the lubri string a data + time saved in datetime
 meta.data <- merge(meta.data1,meta.data2,by = "SampleID") %>% 
   mutate(datetime = ymd(substring(lubri,1,10))+hms(substring(lubri,12,19)))
+
+meta.data <- separate(meta.data, col = AssemblyGroup, into = c("Day.num","ToD"),sep = "_",remove = FALSE, fill = "right", extra = "drop")
 
 # meta.data$lubri <- with_tz(mdy_hms(meta.data$datetime, tz = "UTC"),
 #                            tz = "America/Santiago")
@@ -589,7 +595,7 @@ dfOut$Day <- substring(dfOut$Day,1,nchar(dfOut$Day)-1)
 df.summ <- summarySE(data = dfOut, "Count",
                      groupvars = c("Day","Class.vec"))
 
-Day.Time <- meta.data[,c("AssemblyGroup","datetime")] %>% 
+Day.Time <- meta.data[,c("AssemblyGroup","datetime","Day.num","ToD")] %>% 
   distinct(AssemblyGroup, .keep_all = TRUE)
 
 names(Day.Time)[names(Day.Time) == "AssemblyGroup"] <- "Day"
@@ -636,7 +642,8 @@ p3 <- ggplot(dfOut2)+
   scale_fill_gradient(low = "black",high = "yellow")+
   geom_line(aes(y = Count,
                 x = datetime,
-                color = Class.vec))+
+                color = Class.vec,
+                linetype = Day.num))+
   geom_point(aes(y = Count,
                  x = datetime,
                  color = Class.vec))+
