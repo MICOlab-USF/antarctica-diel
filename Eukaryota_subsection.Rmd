@@ -5,7 +5,13 @@ date: "2023-10-13"
 output: html_document
 ---
 
-```{r setup, include=FALSE}
+The initial code chunk (setup) is designed to clear the global environment, load the libraries needed for the code to run and to then load all the neccesary .csv.
+
+Two meta data tables are loaded and merged together to get the HM (sample number) and the date and time for each sample. This data is also merged with the par data.
+
+After the meta data is loaded, the subsectioned dataset is loaded and the temporal resolution of the par data is decreased to get a smaller sized data set for running the code quicker.
+
+```{r setup, include=T}
 knitr::opts_chunk$set(echo = TRUE)
 
 rm(list = ls())
@@ -42,7 +48,7 @@ meta.data <- separate(meta.data, col = AssemblyGroup, into = c("Day.num","ToD"),
 # meta.data$lubri <- with_tz(mdy_hms(meta.data$datetime, tz = "UTC"),
 #                            tz = "America/Santiago")
 
-COG_categories <- read.csv("CSV_files/COG_categories.csv",sep = ";")
+COG_categories <- read.csv("CSV_files/COG_categories.csv",sep = ",")
 
 Eukaryota.merged <- read.csv("CSV_files/Eukaryota.merged.csv")
 
@@ -98,6 +104,9 @@ partime <- partime[vec,]
 ```
 
 
+The second code chunk, subsections the full TPM and numread datasets to only include Eukaryotic read. This is run with the file: 'TaxonomicAndFunctionalAnnotations.csv' in the CSV_files folder.
+
+The code also removes the .pxx from the Sequence ID.
 
 ```{r}
 #Subsectioning the Eukaryota data from the Taxonomic and Functional Annotations file####
@@ -119,6 +128,7 @@ partime <- partime[vec,]
 # write.csv(Eukaryota,"CSV_files/Eukaryota.subsection.TFA.csv", row.names = F)
 ```
 
+The third code chunk filters the numread and TPM datasets to only include sequences that appear in the TaxonomicAndFunctionalAnnotations.csv file. This requires the files: 'Eukaryota.subsection.TFA.csv' (which is created in the code-chunk above), 'Eukaryota.subsection.numreads.csv' and 'salmon.merged.TPM.subset5.csv' to be present in the CSV_files folder.
 
 ```{r}
 #Using the sequence ID's from the Eukaryota subsection to subsection the numreads and the TPM files####
@@ -138,6 +148,11 @@ partime <- partime[vec,]
 # write.csv(Eukaryota.TPM, "CSV_files/Eukaryota.subsection.TPM.csv",row.names = F)
 ```
 
+The following code filters duplicate sequence IDs, multiple rows had the same sequence ID after the .pxx extension was removed. There is an emphasis on retaining as much data as possible, so the sequences are first filtered to include as many rows containing KEGG annotaions, and secondly rows are kept that contain COG annotations.
+
+This code chunk is found in two versions, and the next code-chunk after this one is almost identical, the difference is that this code-chunk creates a final file that contains numread data, and the second chunk creates a file containing the TPM data.
+
+This chunk needs the files: 'Eukaryota.subsection.numreads.csv' and 'Eukaryota.subsection.TFA.csv' to be present in the CSV_files folder.
 
 ```{r Numread merge}
 
@@ -204,6 +219,11 @@ partime <- partime[vec,]
 # write.csv(df.merged,"CSV_files/Eukaryota.merged.csv",row.names = F)
 ```
 
+This code chunk is the second version, and the previous code-chunk before this one is almost identical, the difference is that this code-chunk creates a final file that contains TPM data, and the second chunk creates a file containing the numread data.
+
+This chunk needs the files: 'Eukaryota.subsection.TPM.csv' and 'Eukaryota.subsection.TFA.csv' to be present in the CSV_files folder.
+
+Note that this chunk overwrites the file created in the previous chunk, this was done to minimize the stored .csv files needed.
 ```{r TPM merge}
 
 #Transcripts per million
@@ -270,6 +290,8 @@ partime <- partime[vec,]
 # write.csv(df.merged,"CSV_files/Eukaryota.merged.csv",row.names = F)
 ```
 
+Exploration of the PAR data, the plot created shows the regular line plot of the par data over time, overlayed on a tiled light intensity indicator.
+
 ```{r}
 
 partime$norm.par <- partime$par / max(partime$par)
@@ -312,6 +334,7 @@ p5
 
 ```
 
+First exploration of the stacked box-plots with the PAR-lineplot overlayed.
 
 ```{r}
 df.merged <- Eukaryota.merged
@@ -338,6 +361,7 @@ for(i in 1:n){ #Looping through the Classes to count the occurrences.
    }
     
     df.count[i,j] <- sum(df.temp[,day.vec[j]])/sum(df.merged[,day.vec[j]])
+    # df.count[i,j] <- sum(df.temp[,day.vec[j]])
     
   }
 }
@@ -407,6 +431,8 @@ p1 <- p1 +
 p1
 ```
 
+Initial exploration of the lineplots connecting all 8 sampling times, with errorbars from the triplicate samples.
+
 ```{r}
 df.merged <- Eukaryota.merged
 
@@ -431,7 +457,8 @@ for(i in 1:n){ #Looping through the Classes to count the occurrences.
      df.count <- cbind(df.count,Class.vec)
    }
     
-    df.count[i,j] <- sum(df.temp[,day.vec[j]])/sum(df.merged[,day.vec[j]])
+    # df.count[i,j] <- sum(df.temp[,day.vec[j]])/sum(df.merged[,day.vec[j]])
+    df.count[i,j] <- sum(df.temp[,day.vec[j]])
     
   }
 }
@@ -531,6 +558,8 @@ p2 <- ggplot(data = dfOut2)+
 p2
 ```
 
+TPM plot per class, broken up with a line connecting samples from day one and a second line connecting samples from day 2. This plot shows the top sum of TPM for each of the top 10 classes as well as for the classes that was not classified. The rest of the classes are summed up in the 'other' category. Next step is to plot the samples with the hour of day on the x-axis rather than the actual time and date that the samples was taken.
+
 ```{r}
 df.merged <- Eukaryota.merged
 
@@ -555,7 +584,8 @@ for(i in 1:n){ #Looping through the Classes to count the occurrences.
      df.count <- cbind(df.count,Class.vec)
    }
     
-    df.count[i,j] <- sum(df.temp[,day.vec[j]])/sum(df.merged[,day.vec[j]])
+    # df.count[i,j] <- sum(df.temp[,day.vec[j]])/sum(df.merged[,day.vec[j]])
+    df.count[i,j] <- sum(df.temp[,day.vec[j]])
     
   }
 }
@@ -637,8 +667,7 @@ p3 <- ggplot(dfOut2)+
                 height = pt.height,
                 fill = par,
                 alpha = .8))+
-  scale_y_continuous(sec.axis = sec_axis(~ ., name = "Secondary Y-axis"),
-                     label = function(y){y*100})+
+  scale_y_continuous(sec.axis = sec_axis(~ ., name = "Secondary Y-axis"))+
   scale_fill_gradient(low = "black",high = "yellow")+
   geom_line(aes(y = Count,
                 x = datetime,
@@ -658,7 +687,7 @@ p3 <- ggplot(dfOut2)+
   scale_x_continuous(breaks = unique(meta.data$datetime),
                      labels = unique(meta.data$AssemblyGroup))+
   labs(title = "Relative TPM per day",
-       y = "TPM per class / total TPM per day (%)",
+       y = "TPM per class",
        x = "Time of sample")+
   theme_classic()+
   theme(axis.text.x = element_text(angle = 90,
@@ -677,7 +706,7 @@ p3
 ggsave("COG_Class_plots/Class_light_plot.png",width = 10,height = 9,dpi = 300)
 ```
 
-Z-scale
+Same plot as above, however this one plots sums the COG-categories for the entire dataset instead of summing the Classes. Next step is to plot the samples with the hour of day on the x-axis rather than the actual time and date that the samples was taken. 
 
 ```{r}
 df.merged <- Eukaryota.merged
@@ -776,7 +805,7 @@ dfOut$Day <- substring(dfOut$Day,1,nchar(dfOut$Day)-1)
 df.summ <- summarySE(data = dfOut, "Count",
                      groupvars = c("Day","COG.vec"))
 
-Day.Time <- meta.data[,c("AssemblyGroup","datetime")] %>% 
+Day.Time <- meta.data[,c("AssemblyGroup","datetime","Day.num","ToD")] %>% 
   distinct(AssemblyGroup, .keep_all = TRUE)
 
 names(Day.Time)[names(Day.Time) == "AssemblyGroup"] <- "Day"
@@ -820,11 +849,13 @@ p4 <- ggplot(dfOut2)+
                 height = pt.height,
                 fill = par,
                 alpha = .8))+
-  scale_y_continuous(sec.axis = sec_axis(~ ., name = "Secondary Y-axis"))+
+  scale_y_continuous(sec.axis = sec_axis(~ ., name = "Secondary Y-axis"),
+                     label = function(y){y*100})+
   scale_fill_gradient(low = "black",high = "yellow")+
   geom_line(aes(y = Count,
                 x = datetime,
-                color = COG.vec))+
+                color = COG.vec,
+                linetype = Day.num))+
   geom_point(aes(y = Count,
                  x = datetime,
                  color = COG.vec))+
@@ -837,7 +868,6 @@ p4 <- ggplot(dfOut2)+
              ncol = 5,
              scales = "free_y",
              labeller = function(variable,value){return(name_vec[value])})+
-  scale_y_continuous(label = function(y){y*100})+
   labs(title = "Relative TPM of each COG category for full data-set",
        y = expression(paste("Relative TPM (%)",sep = "",)),
        x = "Day and time of sampling")+
@@ -929,7 +959,8 @@ for(l in 1:length(Class.plot)){
        df.count <- cbind(df.count,COG.vec)
      }
       
-      df.count[i,j] <- sum(df.temp[,day.vec[j]])/sum(Eukaryota.merged[,day.vec[j]])
+      # df.count[i,j] <- sum(df.temp[,day.vec[j]])/sum(df.merged[,day.vec[j]])
+    df.count[i,j] <- sum(df.temp[,day.vec[j]])
       
     }
   }
@@ -969,7 +1000,7 @@ for(l in 1:length(Class.plot)){
   df.summ <- summarySE(data = dfOut, "Count",
                        groupvars = c("Day","COG.vec"))
   
-  Day.Time <- meta.data[,c("AssemblyGroup","datetime")] %>% 
+  Day.Time <- meta.data[,c("AssemblyGroup","datetime","Day.num","ToD")] %>% 
     distinct(AssemblyGroup, .keep_all = TRUE)
   
   names(Day.Time)[names(Day.Time) == "AssemblyGroup"] <- "Day"
@@ -1025,7 +1056,8 @@ p6 <- ggplot(dfOut2)+
   scale_fill_gradient(low = "black",high = "yellow")+
   geom_line(aes(y = Count,
                 x = datetime,
-                color = Class))+
+                color = Class,
+                linetype = Day.num))+
   geom_point(aes(y = Count,
                  x = datetime,
                  color = Class))+
@@ -1038,9 +1070,8 @@ p6 <- ggplot(dfOut2)+
              ncol = 5,
              scales = "free_y",
              labeller = function(variable,value){return(name_vec[value])})+
-  scale_y_continuous(label = function(y){y*100})+
   labs(title = paste("Relative TPM of each COG category for Top5 Classes",sep = ""),
-       y = expression(paste("Relative TPM (%)",sep = "",)),
+       y = expression(paste("TPM",sep = "",)),
        x = "Day and time of sampling")+
   theme_classic()+
   theme(axis.text.x = element_text(angle = 90,
@@ -1061,7 +1092,7 @@ save.name <- paste("COG_Class_plots/Top5_COG_light_plot.png",sep = "")
 
 ggsave(save.name,width = 15,height = 9,dpi = 300)
 ```
-Group by hour of day instead of seperating the data as two days
+Plotting the TPM for each category against the PAR on the x-axis. Due to one day having a much higher light intensity than the other, I log transformed the x-axis. When I separated the days, the data did seem to show some tendencies, either increasing or decreasing with light levels. The next step for this plot is to look at different classes to see if they show more clearer increases or decreases with the light intensity.
 
 ```{r}
 df.merged <- Eukaryota.merged
@@ -1120,7 +1151,7 @@ for(i in 1:n){ #Looping through the Classes to count the occurrences.
      df.count <- cbind(df.count,COG.vec)
    }
     
-    df.count[i,j] <- sum(df.temp[,day.vec[j]])/sum(df.merged[,day.vec[j]])
+    df.count[i,j] <- sum(df.temp[,day.vec[j]])
     
   }
 }
@@ -1160,7 +1191,7 @@ dfOut$Day <- substring(dfOut$Day,1,nchar(dfOut$Day)-1)
 df.summ <- summarySE(data = dfOut, "Count",
                      groupvars = c("Day","COG.vec"))
 
-Day.Time <- meta.data[,c("AssemblyGroup","datetime","par")] %>% 
+Day.Time <- meta.data[,c("AssemblyGroup","datetime","par","Day.num","ToD")] %>% 
   distinct(AssemblyGroup, .keep_all = TRUE)
 
 names(Day.Time)[names(Day.Time) == "AssemblyGroup"] <- "Day"
@@ -1171,13 +1202,14 @@ p7 <- ggplot(dfOut2)+
   scale_y_continuous(sec.axis = sec_axis(~ ., name = "Secondary Y-axis"))+
   scale_fill_gradient(low = "black",high = "yellow")+
   geom_line(aes(y = Count,
-                x = par,
-                color = COG.vec))+
+                x = log(par),
+                color = COG.vec,
+                linetype = Day.num))+
   geom_point(aes(y = Count,
-                 x = par,
+                 x = log(par),
                  color = COG.vec))+
   geom_errorbar(aes(y = Count,
-                    x = par,
+                    x = log(par),
                     ymin = Count+sd,
                     ymax = Count-sd))+
   facet_wrap(facets = "COG.vec",
@@ -1185,11 +1217,9 @@ p7 <- ggplot(dfOut2)+
              ncol = 5,
              scales = "free_y",
              labeller = function(variable,value){return(name_vec[value])})+
-  scale_y_continuous(label = function(y){y*100})+
-  scale_x_continuous(limits = c(0,0.015))+
-  labs(title = "Relative TPM of each COG category for full data-set",
-       y = expression(paste("Relative TPM (%)",sep = "",)),
-       x = expression(paste("par (µmol photons m"^-2," s"^-1,")",sep = "")))+
+  labs(title = "TPM of each COG category for full data-set",
+       y = expression(paste("TPM",sep = "",)),
+       x = expression(paste("log"[2],"(par) (µmol photons m"^-2," s"^-1,")",sep = "")))+
   theme_classic()+
   theme(axis.text.x = element_text(angle = 90,
                                    vjust = 0.5,
@@ -1207,5 +1237,186 @@ p7
 ggsave("COG_Class_plots/COG_v_light_plot2.png",width = 15,height = 9,dpi = 300)
 ```
 
+Initial exploration of the KEGG data, I found that there are so many different KEGGS if I use the first category in the string of the KEGG's after separating them.
 
+```{r}
+df.merged <- Eukaryota.merged
 
+df.merged <- separate(df.merged,col = KEGG_ko,into = c("KEGG1","KEGG2","KEGG3","KEGG4","KEGG5","KEGG6","KEGG7","KEGG8"), sep = ",", remove = FALSE, fill = "right", extra = "drop")
+
+# filter <- nchar(df.merged$COG_category) == 1
+# df.merged_1COG <- df.merged[filter,] %>% 
+#   mutate(COG.untangled = df.merged$COG_category[filter],
+#          COG_level = "COG1")
+# 
+# df.merged_nCOG <- df.merged[!filter,] %>% 
+#   mutate(COG.untangled = NA)
+# 
+# for(i in 2:max(nchar(df.merged_nCOG$COG_category))){
+#   filter <- nchar(df.merged_nCOG$COG_category) == i
+#   
+#   df.temp <- df.merged_nCOG[filter,]
+#   
+#   for(j in 1:i){
+#     for(k in 1:nrow(df.temp)){
+#       df.temp$COG.untangled[k] <- substring(df.temp$COG_category[k],j,j)
+#     }
+#     
+#     df.temp <- df.temp %>% 
+#       mutate(COG_level = paste("COG",j,sep = ""))
+#     
+#     if(i == 2 & j == 1){
+#       df.untangled <- df.temp
+#     }else{
+#       df.untangled <- rbind(df.untangled,df.temp)
+#     }
+#   }
+#   
+#   if(i == max(nchar(df.merged_nCOG$COG_category))){
+#     df.merged <- rbind(df.merged_1COG,df.untangled)
+#   }
+# }
+# 
+# COG.vec <- unique(df.merged$COG.untangled)
+# n <- length(COG.vec)
+# 
+# day.vec <- paste(meta.data$SampleID,"_quant",sep = "")
+# m <- length(day.vec)
+# 
+# for(i in 1:n){ #Looping through the Classes to count the occurrences.
+#   
+#   COG.filter <- df.merged$COG.untangled == COG.vec[i]
+#   df.temp <- df.merged[COG.filter,]
+#   
+#   for(j in 1:m){ #Looping through the sampling time points.
+#     
+#    if(i == 1 & j == 1){ #Sets up an empty data.frame to input the data
+#      
+#      df.count <- data.frame(matrix(ncol = m, nrow = n))
+#      names(df.count) <- meta.data$SampleName
+#      
+#      df.count <- cbind(df.count,COG.vec)
+#    }
+#     
+#     df.count[i,j] <- sum(df.temp[,day.vec[j]])/sum(df.merged[,day.vec[j]])
+#     
+#   }
+# }
+# 
+# df.merged2 <- df.merged[df.merged$COG.untangled != "-",]
+# 
+# top5.vec <- names(table(df.merged2$COG.untangled)[order(-table(df.merged2$COG.untangled))[1:24]])
+# 
+# top5.filter <- df.count$COG.vec %in% c(top5.vec)
+# 
+# df.top5 <- df.count[top5.filter,]
+# df.other <- df.count[!top5.filter,]
+# 
+# df.count2 <- rbind(df.top5,c(colSums(df.other[,1:24]),"Other"))
+# 
+# order.vec <- c("Day1_afternoon",
+#                "Day1_evening",
+#                "Day1_night",
+#                "Day1_morning",
+#                "Day2_night",
+#                "Day2_morning",
+#                "Day2_afternoon",
+#                "Day2_evening")
+# 
+# name_vec <- COG_categories$Description
+# 
+# names(name_vec) <- COG_categories$Category
+# 
+# dfOut <- pivot_longer(df.count2,
+#                       all_of(meta.data$SampleName),
+#                       names_to = "Day",
+#                       values_to = "Count") %>% 
+#   mutate(Count = as.numeric(Count))
+# 
+# dfOut$Day <- substring(dfOut$Day,1,nchar(dfOut$Day)-1)
+# 
+# df.summ <- summarySE(data = dfOut, "Count",
+#                      groupvars = c("Day","COG.vec"))
+# 
+# Day.Time <- meta.data[,c("AssemblyGroup","datetime","Day.num","ToD")] %>% 
+#   distinct(AssemblyGroup, .keep_all = TRUE)
+# 
+# names(Day.Time)[names(Day.Time) == "AssemblyGroup"] <- "Day"
+# 
+# dfOut2 <- merge(df.summ,Day.Time,by = "Day") #%>% mutate(COG.vec = factor(COG.vec, labels = name_vec))
+# 
+# partime$norm.par <- (partime$par / max(partime$par))*.03
+# 
+# partime2 <- partime
+# 
+# filter <- partime2$lubri < min(dfOut2$datetime)
+# 
+# partime2 <- partime2[!filter,]
+# 
+# n <- length(unique(dfOut2$COG.vec))
+# 
+# for(i in 1:n){
+#   
+#   filter <- dfOut2$COG.vec == unique(dfOut2$COG.vec)[i]
+#   
+#   pt.y <- round(mean(c(max(dfOut2$Count[filter]+dfOut2$sd[filter]), min(dfOut2$Count[filter]-dfOut2$sd[filter]))),5)
+#   pt.height <- round(max(dfOut2$Count[filter]+dfOut2$sd[filter]) - min(dfOut2$Count[filter]-dfOut2$sd[filter]),5)
+#   
+#   partime2.temp <- partime2 %>% 
+#       mutate(pt.y = pt.y,
+#              pt.height = pt.height,
+#              COG.vec = unique(dfOut2$COG.vec)[i])
+#   
+#   if(i == 1){
+#     partime3 <- partime2.temp
+#   }else{
+#     partime3 <- rbind(partime3,partime2.temp)
+#   }
+#   
+# }
+# 
+# p8 <- ggplot(dfOut2)+
+#   geom_tile(data = partime3,
+#             aes(x = lubri,
+#                 y = pt.y,
+#                 height = pt.height,
+#                 fill = par,
+#                 alpha = .8))+
+#   scale_y_continuous(sec.axis = sec_axis(~ ., name = "Secondary Y-axis"),
+#                      label = function(y){y*100})+
+#   scale_fill_gradient(low = "black",high = "yellow")+
+#   geom_line(aes(y = Count,
+#                 x = datetime,
+#                 color = COG.vec,
+#                 linetype = Day.num))+
+#   geom_point(aes(y = Count,
+#                  x = datetime,
+#                  color = COG.vec))+
+#   geom_errorbar(aes(y = Count,
+#                     x = datetime,
+#                     ymin = Count+sd,
+#                     ymax = Count-sd))+
+#   facet_wrap(facets = "COG.vec",
+#              nrow = 5,
+#              ncol = 5,
+#              scales = "free_y",
+#              labeller = function(variable,value){return(name_vec[value])})+
+#   labs(title = "Relative TPM of each COG category for full data-set",
+#        y = expression(paste("Relative TPM (%)",sep = "",)),
+#        x = "Day and time of sampling")+
+#   theme_classic()+
+#   theme(axis.text.x = element_text(angle = 90,
+#                                    vjust = 0.5,
+#                                    hjust=1),
+#         legend.position = "none",
+#         axis.line.y.right = element_blank(),
+#         axis.title.y.right = element_blank(),
+#         axis.text.y.right = element_blank(),
+#         axis.ticks.y.right = element_blank(),
+#         strip.text.x = element_text(size = 6))+
+#   guides(fill = guide_legend(title = "COG"))
+# 
+# p8
+# 
+# ggsave("COG_Class_plots/COG_light_plot.png",width = 15,height = 9,dpi = 300)
+```
