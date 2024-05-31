@@ -48,7 +48,7 @@ meta.data <- separate(meta.data, col = AssemblyGroup, into = c("Day.num","ToD"),
 # meta.data$lubri <- with_tz(mdy_hms(meta.data$datetime, tz = "UTC"),
 #                            tz = "America/Santiago")
 
-COG_categories <- read.csv("CSV_files/COG_categories.csv",sep = ",")
+COG_categories <- read.csv("CSV_files/COG_categories.csv",sep = ";")
 
 Eukaryota.merged <- read.csv("CSV_files/Eukaryota.merged.csv")
 
@@ -156,7 +156,7 @@ This chunk needs the files: 'Eukaryota.subsection.numreads.csv' and 'Eukaryota.s
 
 ```{r Numread merge}
 
-#Raw read
+# #Raw read
 # Eukaryota.numread <- read.csv("CSV_files/Eukaryota.subsection.numreads.csv")
 # 
 # Eukaryota.TFA <- read.csv("CSV_files/Eukaryota.subsection.TFA.csv")
@@ -219,14 +219,14 @@ This chunk needs the files: 'Eukaryota.subsection.numreads.csv' and 'Eukaryota.s
 # write.csv(df.merged,"CSV_files/Eukaryota.merged.csv",row.names = F)
 ```
 
-This code chunk is the second version, and the previous code-chunk before this one is almost identical, the difference is that this code-chunk creates a final file that contains TPM data, and the second chunk creates a file containing the numread data.
+This code chunk is the second version, and the previous code-chunk before this one is almost identical, the difference is that this code-chunk creates a final file that contains TPM data, and the other chunk creates a file containing the numread data.
 
 This chunk needs the files: 'Eukaryota.subsection.TPM.csv' and 'Eukaryota.subsection.TFA.csv' to be present in the CSV_files folder.
 
 Note that this chunk overwrites the file created in the previous chunk, this was done to minimize the stored .csv files needed.
 ```{r TPM merge}
 
-#Transcripts per million
+# #Transcripts per million
 # Eukaryota.TPM <- read.csv("CSV_files/Eukaryota.subsection.TPM.csv")
 # 
 # Eukaryota.TFA <- read.csv("CSV_files/Eukaryota.subsection.TFA.csv")
