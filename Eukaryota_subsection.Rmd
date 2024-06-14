@@ -14,7 +14,7 @@ After the meta data is loaded, the subsectioned dataset is loaded and the tempor
 ```{r setup, include=T}
 knitr::opts_chunk$set(echo = TRUE)
 
-rm(list = ls())
+#rm(list = ls())
 
 package.list <- c("dplyr","tidyverse","ggplot2","lemon","vegan","Rmisc","lubridate")
 
@@ -111,19 +111,20 @@ The code also removes the .pxx from the Sequence ID.
 ```{r}
 #Subsectioning the Eukaryota data from the Taxonomic and Functional Annotations file####
 
+# #Loading the raw file
 # tax.func <- read.csv("CSV_files/TaxonomicAndFunctionalAnnotations.csv", sep = "\t")
 # 
+# #Splitting the column with full_classification into seperate columns
 # tax.func <- separate(tax.func,col = full_classification,into = c("Domain","Supergroup","Division","Class","Order","Family","Genus","Species"), sep = "; ", remove = FALSE, fill = "right", extra = "drop")
 # 
+# #Cleaning up data by removing blank spaces at the beginning of entries in the Domain column.
 # tax.func$Domain <- ifelse(substring(tax.func$Domain,1,1) == " ", substring(tax.func$Domain,2), tax.func$Domain)
 # 
+# #Filtering out all the rows with Bacteria data, leaving only Eukaryote data
 # Eukaryota <- tax.func[tax.func$Domain == "Eukaryota",]
 # 
-# Eukaryota$SequenceID <- ifelse(substring(Eukaryota$transcript_name, nchar(Eukaryota$transcript_name)-2, nchar(Eukaryota$transcript_name)-2) == ".",
-#                               Eukaryota$SequenceID <- substring(Eukaryota$transcript_name,1,nchar(Eukaryota$transcript_name)-3),
-#                               ifelse(substring(Eukaryota$transcript_name, nchar(Eukaryota$transcript_name)-3, nchar(Eukaryota$transcript_name)-3) == ".",
-#                                      Eukaryota$SequenceID <- substring(Eukaryota$transcript_name,1,nchar(Eukaryota$transcript_name)-4),
-#                                      Eukaryota$SequenceID <- Eukaryota$SequenceID))
+# #Removing the .p after sequence names, in order to remove duplicate sequences later.
+# Eukaryota$SequenceID <- unlist(lapply(Eukaryota$SequenceID,function(x){unlist(strsplit(x,split = ".",fixed = TRUE))[1]}))
 # 
 # write.csv(Eukaryota,"CSV_files/Eukaryota.subsection.TFA.csv", row.names = F)
 ```
@@ -279,7 +280,7 @@ Note that this chunk overwrites the file created in the previous chunk, this was
 # 
 # Eukaryota.noRep$Class <- ifelse(substring(Eukaryota.noRep$Class,nchar(Eukaryota.noRep$Class)-7) == " (Class)",
 #                              substring(Eukaryota.noRep$Class,1,nchar(Eukaryota.noRep$Class)-8),
-#                              Eukaryota.noRep$Class)
+#                              Eukaryota.noRep$Class) #Is this statement even needed?
 # 
 # names(Eukaryota.TPM)[1] <- "SequenceID"
 # 
@@ -1242,7 +1243,11 @@ Initial exploration of the KEGG data, I found that there are so many different K
 ```{r}
 df.merged <- Eukaryota.merged
 
-df.merged <- separate(df.merged,col = KEGG_ko,into = c("KEGG1","KEGG2","KEGG3","KEGG4","KEGG5","KEGG6","KEGG7","KEGG8"), sep = ",", remove = FALSE, fill = "right", extra = "drop")
+df.merged <- separate(df.merged,col = KEGG_ko,into = c("KEGG1","KEGG2","KEGG3","KEGG4","KEGG5",
+                                                       "KEGG6","KEGG7","KEGG8","KEGG9","KEGG10",
+                                                       "KEGG11","KEGG12","KEGG13","KEGG14","KEGG15",
+                                                       "KEGG16","KEGG17","KEGG18","KEGG19"),
+                      sep = ",", remove = FALSE, fill = "right", extra = "drop")
 
 # filter <- nchar(df.merged$COG_category) == 1
 # df.merged_1COG <- df.merged[filter,] %>% 
