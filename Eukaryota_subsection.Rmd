@@ -1203,14 +1203,13 @@ p7 <- ggplot(dfOut2)+
   scale_y_continuous(sec.axis = sec_axis(~ ., name = "Secondary Y-axis"))+
   scale_fill_gradient(low = "black",high = "yellow")+
   geom_line(aes(y = Count,
-                x = log(par),
-                color = COG.vec,
-                linetype = Day.num))+
+                x = substring(datetime,12),
+                color = COG.vec))+
   geom_point(aes(y = Count,
-                 x = log(par),
+                 x = substring(datetime,12),
                  color = COG.vec))+
   geom_errorbar(aes(y = Count,
-                    x = log(par),
+                    x = substring(datetime,12),
                     ymin = Count+sd,
                     ymax = Count-sd))+
   facet_wrap(facets = "COG.vec",
@@ -1234,6 +1233,43 @@ p7 <- ggplot(dfOut2)+
   guides(fill = guide_legend(title = "COG"))
 
 p7
+
+# p7 <- ggplot(dfOut2)+
+#   scale_y_continuous(sec.axis = sec_axis(~ ., name = "Secondary Y-axis"))+
+#   scale_fill_gradient(low = "black",high = "yellow")+
+#   geom_line(aes(y = Count,
+#                 x = log(par),
+#                 color = COG.vec,
+#                 linetype = Day.num))+
+#   geom_point(aes(y = Count,
+#                  x = log(par),
+#                  color = COG.vec))+
+#   geom_errorbar(aes(y = Count,
+#                     x = log(par),
+#                     ymin = Count+sd,
+#                     ymax = Count-sd))+
+#   facet_wrap(facets = "COG.vec",
+#              nrow = 5,
+#              ncol = 5,
+#              scales = "free_y",
+#              labeller = function(variable,value){return(name_vec[value])})+
+#   labs(title = "TPM of each COG category for full data-set",
+#        y = expression(paste("TPM",sep = "",)),
+#        x = expression(paste("log"[2],"(par) (µmol photons m"^-2," s"^-1,")",sep = "")))+
+#   theme_classic()+
+#   theme(axis.text.x = element_text(angle = 90,
+#                                    vjust = 0.5,
+#                                    hjust=1),
+#         legend.position = "none",
+#         axis.line.y.right = element_blank(),
+#         axis.title.y.right = element_blank(),
+#         axis.text.y.right = element_blank(),
+#         axis.ticks.y.right = element_blank(),
+#         strip.text.x = element_text(size = 6))+
+#   guides(fill = guide_legend(title = "COG"))
+# 
+# 
+# p7
 
 ggsave("COG_Class_plots/COG_v_light_plot2.png",width = 15,height = 9,dpi = 300)
 ```
@@ -1265,5 +1301,7 @@ for(i in 1:nrow(df.merged)){
     n <- m
   }
 }
+
+n
 
 ```
