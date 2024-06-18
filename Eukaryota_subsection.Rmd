@@ -48,7 +48,7 @@ meta.data <- separate(meta.data, col = AssemblyGroup, into = c("Day.num","ToD"),
 # meta.data$lubri <- with_tz(mdy_hms(meta.data$datetime, tz = "UTC"),
 #                            tz = "America/Santiago")
 
-COG_categories <- read.csv("CSV_files/COG_categories.csv",sep = ";")
+COG_categories <- read.csv("CSV_files/COG_categories.csv",sep = ",")
 
 Eukaryota.merged <- read.csv("CSV_files/Eukaryota.merged.csv")
 
@@ -1168,14 +1168,10 @@ df.other <- df.count[!top5.filter,]
 
 df.count2 <- rbind(df.top5,c(colSums(df.other[,1:24]),"Other"))
 
-order.vec <- c("Day1_afternoon",
-               "Day1_evening",
-               "Day1_night",
-               "Day1_morning",
-               "Day2_night",
-               "Day2_morning",
-               "Day2_afternoon",
-               "Day2_evening")
+order.vec <- c("morning",
+               "afternoon",
+               "evening",
+               "night")
 
 name_vec <- COG_categories$Description
 
@@ -1202,14 +1198,14 @@ dfOut2 <- merge(df.summ,Day.Time,by = "Day") #%>% mutate(COG.vec = factor(COG.ve
 p7 <- ggplot(dfOut2)+
   scale_y_continuous(sec.axis = sec_axis(~ ., name = "Secondary Y-axis"))+
   scale_fill_gradient(low = "black",high = "yellow")+
-  geom_line(aes(y = Count,
-                x = substring(datetime,12),
-                color = COG.vec))+
+  # geom_line(aes(y = Count,
+  #               x = factor(ToD, level = order.vec),
+  #               color = Day.num))+
   geom_point(aes(y = Count,
-                 x = substring(datetime,12),
-                 color = COG.vec))+
+                 x = factor(ToD, level = order.vec),
+                 color = Day.num))+
   geom_errorbar(aes(y = Count,
-                    x = substring(datetime,12),
+                    x = factor(ToD, level = order.vec),
                     ymin = Count+sd,
                     ymax = Count-sd))+
   facet_wrap(facets = "COG.vec",
@@ -1219,12 +1215,12 @@ p7 <- ggplot(dfOut2)+
              labeller = function(variable,value){return(name_vec[value])})+
   labs(title = "TPM of each COG category for full data-set",
        y = expression(paste("TPM",sep = "",)),
-       x = expression(paste("log"[2],"(par) (µmol photons m"^-2," s"^-1,")",sep = "")))+
+       x = expression("Time of Day"))+
   theme_classic()+
   theme(axis.text.x = element_text(angle = 90,
                                    vjust = 0.5,
                                    hjust=1),
-        legend.position = "none",
+        legend.position = "right",
         axis.line.y.right = element_blank(),
         axis.title.y.right = element_blank(),
         axis.text.y.right = element_blank(),
@@ -1279,10 +1275,16 @@ Initial exploration of the KEGG data, I found that there are so many different K
 ```{r}
 df.merged <- Eukaryota.merged
 
-df.merged <- separate(df.merged,col = KEGG_ko,into = c("KEGG1","KEGG2","KEGG3","KEGG4","KEGG5",
-                                                       "KEGG6","KEGG7","KEGG8","KEGG9","KEGG10",
-                                                       "KEGG11","KEGG12","KEGG13","KEGG14","KEGG15",
-                                                       "KEGG16","KEGG17","KEGG18","KEGG19"),
+# df.merged <- separate(df.merged,col = KEGG_ko,into = c("KEGG1","KEGG2","KEGG3","KEGG4","KEGG5",
+#                                                        "KEGG6","KEGG7","KEGG8","KEGG9","KEGG10",
+#                                                        "KEGG11","KEGG12","KEGG13","KEGG14","KEGG15",
+#                                                        "KEGG16","KEGG17","KEGG18","KEGG19"),
+#                       sep = ",", remove = FALSE, fill = "right", extra = "drop")
+
+df.merged <- separate(df.merged,col = PFAMs,into = c("PFAMs1","PFAMs2","PFAMs3","PFAMs4","PFAMs5",
+                                                       "PFAMs6","PFAMs7","PFAMs8","PFAMs9","PFAMs10",
+                                                       "PFAMs11","PFAMs12","PFAMs13","PFAMs14","PFAMs15",
+                                                       "PFAMs16","PFAMs17","PFAMs18","PFAMs19"),
                       sep = ",", remove = FALSE, fill = "right", extra = "drop")
 
 test_df <- df.merged[1:100,]
@@ -1293,15 +1295,29 @@ split_function <- function(x){
 
 for(i in 1:nrow(df.merged)){
   if(i == 1){
-    n <- length(unlist(split_function(df.merged$KEGG_ko[i])))
+    n_KEGG <- length(unlist(split_function(df.merged$KEGG_ko[i])))
+    n_GOs <- length(unlist(split_function(df.merged$GOs[i])))
+    n_PFAMs <- length(unlist(split_function(df.merged$PFAMs[i])))
   }
-  m <- length(unlist(split_function(df.merged$KEGG_ko[i])))
+  m_KEGG <- length(unlist(split_function(df.merged$KEGG_ko[i])))
+  m_GOs <- length(unlist(split_function(df.merged$GOs[i])))
+  m_PFAMs <- length(unlist(split_function(df.merged$PFAMs[i])))
   
-  if(m > n){
-    n <- m
+  if(m_KEGG > n_KEGG){
+    n_KEGG <- m_KEGG
+  }
+  
+  if(m_GOs > n_GOs){
+    n_GOs <- m_GOs
+  }
+  
+  if(m_PFAMs > n_PFAMs){
+    n_PFAMs <- m_PFAMs
   }
 }
 
-n
+n_KEGG
+n_GOs
+n_PFAMs
 
 ```
