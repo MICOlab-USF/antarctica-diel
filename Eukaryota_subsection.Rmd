@@ -48,7 +48,7 @@ meta.data <- separate(meta.data, col = AssemblyGroup, into = c("Day.num","ToD"),
 # meta.data$lubri <- with_tz(mdy_hms(meta.data$datetime, tz = "UTC"),
 #                            tz = "America/Santiago")
 
-COG_categories <- read.csv("CSV_files/COG_categories.csv",sep = ",")
+COG_categories <- read.csv("CSV_files/COG_categories.csv",sep = ";")
 
 Eukaryota.merged <- read.csv("CSV_files/Eukaryota.merged.csv")
 
@@ -1195,53 +1195,17 @@ names(Day.Time)[names(Day.Time) == "AssemblyGroup"] <- "Day"
 
 dfOut2 <- merge(df.summ,Day.Time,by = "Day") #%>% mutate(COG.vec = factor(COG.vec, labels = name_vec))
 
-p7 <- ggplot(dfOut2)+
-  scale_y_continuous(sec.axis = sec_axis(~ ., name = "Secondary Y-axis"))+
-  scale_fill_gradient(low = "black",high = "yellow")+
-  # geom_line(aes(y = Count,
-  #               x = factor(ToD, level = order.vec),
-  #               color = Day.num))+
-  geom_point(aes(y = Count,
-                 x = factor(ToD, level = order.vec),
-                 color = Day.num))+
-  geom_errorbar(aes(y = Count,
-                    x = factor(ToD, level = order.vec),
-                    ymin = Count+sd,
-                    ymax = Count-sd))+
-  facet_wrap(facets = "COG.vec",
-             nrow = 5,
-             ncol = 5,
-             scales = "free_y",
-             labeller = function(variable,value){return(name_vec[value])})+
-  labs(title = "TPM of each COG category for full data-set",
-       y = expression(paste("TPM",sep = "",)),
-       x = expression("Time of Day"))+
-  theme_classic()+
-  theme(axis.text.x = element_text(angle = 90,
-                                   vjust = 0.5,
-                                   hjust=1),
-        legend.position = "right",
-        axis.line.y.right = element_blank(),
-        axis.title.y.right = element_blank(),
-        axis.text.y.right = element_blank(),
-        axis.ticks.y.right = element_blank(),
-        strip.text.x = element_text(size = 6))+
-  guides(fill = guide_legend(title = "COG"))
-
-p7
-
 # p7 <- ggplot(dfOut2)+
 #   scale_y_continuous(sec.axis = sec_axis(~ ., name = "Secondary Y-axis"))+
 #   scale_fill_gradient(low = "black",high = "yellow")+
-#   geom_line(aes(y = Count,
-#                 x = log(par),
-#                 color = COG.vec,
-#                 linetype = Day.num))+
+#   # geom_line(aes(y = Count,
+#   #               x = factor(ToD, level = order.vec),
+#   #               color = Day.num))+
 #   geom_point(aes(y = Count,
-#                  x = log(par),
-#                  color = COG.vec))+
+#                  x = factor(ToD, level = order.vec),
+#                  color = Day.num))+
 #   geom_errorbar(aes(y = Count,
-#                     x = log(par),
+#                     x = factor(ToD, level = order.vec),
 #                     ymin = Count+sd,
 #                     ymax = Count-sd))+
 #   facet_wrap(facets = "COG.vec",
@@ -1251,12 +1215,12 @@ p7
 #              labeller = function(variable,value){return(name_vec[value])})+
 #   labs(title = "TPM of each COG category for full data-set",
 #        y = expression(paste("TPM",sep = "",)),
-#        x = expression(paste("log"[2],"(par) (µmol photons m"^-2," s"^-1,")",sep = "")))+
+#        x = expression("Time of Day"))+
 #   theme_classic()+
 #   theme(axis.text.x = element_text(angle = 90,
 #                                    vjust = 0.5,
 #                                    hjust=1),
-#         legend.position = "none",
+#         legend.position = "right",
 #         axis.line.y.right = element_blank(),
 #         axis.title.y.right = element_blank(),
 #         axis.text.y.right = element_blank(),
@@ -1264,10 +1228,46 @@ p7
 #         strip.text.x = element_text(size = 6))+
 #   guides(fill = guide_legend(title = "COG"))
 # 
-# 
 # p7
 
-ggsave("COG_Class_plots/COG_v_light_plot2.png",width = 15,height = 9,dpi = 300)
+p7 <- ggplot(dfOut2)+
+  scale_y_continuous(sec.axis = sec_axis(~ ., name = "Secondary Y-axis"))+
+  scale_fill_gradient(low = "black",high = "yellow")+
+  geom_line(aes(y = Count,
+                x = log(par),
+                color = COG.vec,
+                linetype = Day.num))+
+  geom_point(aes(y = Count,
+                 x = log(par),
+                 color = COG.vec))+
+  geom_errorbar(aes(y = Count,
+                    x = log(par),
+                    ymin = Count+sd,
+                    ymax = Count-sd))+
+  facet_wrap(facets = "COG.vec",
+             nrow = 5,
+             ncol = 5,
+             scales = "free_y",
+             labeller = function(variable,value){return(name_vec[value])})+
+  labs(title = "TPM of each COG category for full data-set",
+       y = expression(paste("TPM",sep = "",)),
+       x = expression(paste("log"[2],"(par) (µmol photons m"^-2," s"^-1,")",sep = "")))+
+  theme_classic()+
+  theme(axis.text.x = element_text(angle = 90,
+                                   vjust = 0.5,
+                                   hjust=1),
+        legend.position = "none",
+        axis.line.y.right = element_blank(),
+        axis.title.y.right = element_blank(),
+        axis.text.y.right = element_blank(),
+        axis.ticks.y.right = element_blank(),
+        strip.text.x = element_text(size = 6))+
+  guides(fill = guide_legend(title = "COG"))
+
+
+p7
+
+ggsave("COG_Class_plots/COG_v_light_plot2.png",width = 8,height = 7.5,dpi = 300)
 ```
 
 Initial exploration of the KEGG data, I found that there are so many different KEGGS if I use the first category in the string of the KEGG's after separating them.
