@@ -782,14 +782,19 @@ df.other <- df.count[!top5.filter,]
 
 df.count2 <- rbind(df.top5,c(colSums(df.other[,1:24]),"Other"))
 
-order.vec <- c("Day1_afternoon",
-               "Day1_evening",
-               "Day1_night",
-               "Day1_morning",
-               "Day2_night",
-               "Day2_morning",
-               "Day2_afternoon",
-               "Day2_evening")
+# order.vec <- c("Day1_afternoon",
+#                "Day1_evening",
+#                "Day1_night",
+#                "Day1_morning",
+#                "Day2_night",
+#                "Day2_morning",
+#                "Day2_afternoon",
+#                "Day2_evening")
+
+order.vec <- c("morning",
+               "afternoon",
+               "evening",
+               "night")
 
 name_vec <- COG_categories$Description
 
@@ -843,27 +848,78 @@ for(i in 1:n){
   
 }
 
+# p4 <- ggplot(dfOut2)+
+#   geom_tile(data = partime3,
+#             aes(x = lubri,
+#                 y = pt.y,
+#                 height = pt.height,
+#                 fill = par,
+#                 alpha = .8))+
+#   scale_y_continuous(sec.axis = sec_axis(~ ., name = "Secondary Y-axis"),
+#                      label = function(y){y*100})+
+#   scale_fill_gradient(low = "black",high = "yellow")+
+#   geom_line(aes(y = Count,
+#                 x = datetime,
+#                 color = COG.vec,
+#                 linetype = Day.num))+
+#   geom_point(aes(y = Count,
+#                  x = datetime,
+#                  color = COG.vec))+
+#   geom_errorbar(aes(y = Count,
+#                     x = datetime,
+#                     ymin = Count+sd,
+#                     ymax = Count-sd))+
+#   facet_wrap(facets = "COG.vec",
+#              nrow = 5,
+#              ncol = 5,
+#              scales = "free_y",
+#              labeller = function(variable,value){return(name_vec[value])})+
+#   labs(title = "Relative TPM of each COG category for full data-set",
+#        y = expression(paste("Relative TPM (%)",sep = "",)),
+#        x = "Day and time of sampling")+
+#   theme_classic()+
+#   theme(axis.text.x = element_text(angle = 90,
+#                                    vjust = 0.5,
+#                                    hjust=1),
+#         legend.position = "none",
+#         axis.line.y.right = element_blank(),
+#         axis.title.y.right = element_blank(),
+#         axis.text.y.right = element_blank(),
+#         axis.ticks.y.right = element_blank(),
+#         strip.text.x = element_text(size = 6))+
+#   guides(fill = guide_legend(title = "COG"))
+# 
+# p4
+
+# scale_x_continuous(breaks = unique(meta.data$datetime),
+#                      labels = unique(meta.data$AssemblyGroup))
+
+for(i in 1:nrow(dfOut2)){
+  if(i == 1){
+    vec <- rep(NA,nrow(dfOut2))
+  }
+  
+  vec[i] <- (1:length(order.vec))[order.vec == dfOut2$ToD[i]]
+  
+  if(i == nrow(dfOut2)){
+    dfOut2 <- cbind(dfOut2,vec)
+    names(dfOut2)[names(dfOut2) == "vec"] <- "ToD.number"
+  }
+}
+
 p4 <- ggplot(dfOut2)+
-  geom_tile(data = partime3,
-            aes(x = lubri,
-                y = pt.y,
-                height = pt.height,
-                fill = par,
-                alpha = .8))+
-  scale_y_continuous(sec.axis = sec_axis(~ ., name = "Secondary Y-axis"),
-                     label = function(y){y*100})+
-  scale_fill_gradient(low = "black",high = "yellow")+
   geom_line(aes(y = Count,
-                x = datetime,
-                color = COG.vec,
+                x = ToD.number,
                 linetype = Day.num))+
   geom_point(aes(y = Count,
-                 x = datetime,
-                 color = COG.vec))+
+                 x = ToD.number))+
   geom_errorbar(aes(y = Count,
-                    x = datetime,
+                    x = ToD.number,
                     ymin = Count+sd,
-                    ymax = Count-sd))+
+                    ymax = Count-sd,
+                    width = .2))+
+  scale_x_continuous(breaks = 1:4,
+                     labels = order.vec)+
   facet_wrap(facets = "COG.vec",
              nrow = 5,
              ncol = 5,
@@ -1096,6 +1152,8 @@ ggsave(save.name,width = 15,height = 9,dpi = 300)
 Plotting the TPM for each category against the PAR on the x-axis. Due to one day having a much higher light intensity than the other, I log transformed the x-axis. When I separated the days, the data did seem to show some tendencies, either increasing or decreasing with light levels. The next step for this plot is to look at different classes to see if they show more clearer increases or decreases with the light intensity.
 
 ```{r}
+
+  
 df.merged <- Eukaryota.merged
 
 filter <- nchar(df.merged$COG_category) == 1
@@ -1173,7 +1231,8 @@ order.vec <- c("morning",
                "evening",
                "night")
 
-name_vec <- COG_categories$Description
+# name_vec <- COG_categories$Short_name
+name_vec <- COG_categories$Name_and_Category
 
 names(name_vec) <- COG_categories$Category
 
@@ -1195,79 +1254,299 @@ names(Day.Time)[names(Day.Time) == "AssemblyGroup"] <- "Day"
 
 dfOut2 <- merge(df.summ,Day.Time,by = "Day") #%>% mutate(COG.vec = factor(COG.vec, labels = name_vec))
 
+filter <- dfOut2$COG.vec == "Other"
+dfOut2 <- dfOut2[!filter,]
+
+for(i in 1:nrow(dfOut2)){
+  if(i == 1){
+    vec <- rep(NA,nrow(dfOut2))
+  }
+  
+  vec[i] <- (1:length(order.vec))[order.vec == dfOut2$ToD[i]]
+  
+  if(i == nrow(dfOut2)){
+    dfOut2 <- cbind(dfOut2,vec)
+    names(dfOut2)[names(dfOut2) == "vec"] <- "ToD.number"
+  }
+}
+
 # p7 <- ggplot(dfOut2)+
-#   scale_y_continuous(sec.axis = sec_axis(~ ., name = "Secondary Y-axis"))+
-#   scale_fill_gradient(low = "black",high = "yellow")+
-#   # geom_line(aes(y = Count,
-#   #               x = factor(ToD, level = order.vec),
-#   #               color = Day.num))+
+#   geom_line(aes(y = Count,
+#                 x = log(par,2),
+#                 linetype = Day.num))+
 #   geom_point(aes(y = Count,
-#                  x = factor(ToD, level = order.vec),
-#                  color = Day.num))+
+#                  x = log(par,2)))+
 #   geom_errorbar(aes(y = Count,
-#                     x = factor(ToD, level = order.vec),
+#                     x = log(par,2),
 #                     ymin = Count+sd,
 #                     ymax = Count-sd))+
+#   scale_y_continuous(n.breaks = 3)+
 #   facet_wrap(facets = "COG.vec",
-#              nrow = 5,
-#              ncol = 5,
+#              nrow = 6,
+#              ncol = 4,
 #              scales = "free_y",
 #              labeller = function(variable,value){return(name_vec[value])})+
-#   labs(title = "TPM of each COG category for full data-set",
-#        y = expression(paste("TPM",sep = "",)),
-#        x = expression("Time of Day"))+
-#   theme_classic()+
-#   theme(axis.text.x = element_text(angle = 90,
+#   labs(y = expression(paste("Transcripts per million",sep = "",)),
+#        x = expression(paste("log"[2],"(par) (µmol photons m"^-2," s"^-1,")",sep = "")))+
+#   theme_classic(base_size = 14)+
+#   theme(legend.title=element_blank(),
+#         legend.justification = "left",
+#         legend.key.size = unit(1, "cm"),
+#         legend.box = "vertical",
+#         legend.box.just = "left",
+#         legend.spacing.y = unit(0, "cm"),
+#         legend.box.spacing = unit(0.2, "cm"),
+#         panel.spacing = unit(.2,"lines"),
+#         axis.text.x = element_text(angle = 90,
 #                                    vjust = 0.5,
 #                                    hjust=1),
-#         legend.position = "right",
-#         axis.line.y.right = element_blank(),
-#         axis.title.y.right = element_blank(),
-#         axis.text.y.right = element_blank(),
-#         axis.ticks.y.right = element_blank(),
-#         strip.text.x = element_text(size = 6))+
-#   guides(fill = guide_legend(title = "COG"))
+#         axis.text = element_text(colour = "black"),
+#         axis.ticks = element_line(colour = "black"),
+#         panel.border = element_rect(linewidth = .2,
+#                                     colour = "black",
+#                                     fill = NA),
+#         strip.background.x =  element_rect(colour = NA,
+#                                            fill = NA),
+#         strip.text.x = element_text(face = "bold",
+#                                     size = 8.2),
+#         legend.position = "none")+
+#   guides(linetype = guide_legend(title = "Day"),
+#          color = "none")
 # 
 # p7
 
 p7 <- ggplot(dfOut2)+
-  scale_y_continuous(sec.axis = sec_axis(~ ., name = "Secondary Y-axis"))+
-  scale_fill_gradient(low = "black",high = "yellow")+
   geom_line(aes(y = Count,
-                x = log(par),
-                color = COG.vec,
+                x = ToD.number,
                 linetype = Day.num))+
   geom_point(aes(y = Count,
-                 x = log(par),
-                 color = COG.vec))+
+                 x = ToD.number))+
   geom_errorbar(aes(y = Count,
-                    x = log(par),
+                    x = ToD.number,
                     ymin = Count+sd,
-                    ymax = Count-sd))+
+                    ymax = Count-sd,
+                    width = .2))+
+  scale_x_continuous(breaks = 1:4,
+                     labels = order.vec)+
+  scale_y_continuous(n.breaks = 3)+
   facet_wrap(facets = "COG.vec",
-             nrow = 5,
-             ncol = 5,
+             nrow = 6,
+             ncol = 4,
              scales = "free_y",
              labeller = function(variable,value){return(name_vec[value])})+
-  labs(title = "TPM of each COG category for full data-set",
-       y = expression(paste("TPM",sep = "",)),
-       x = expression(paste("log"[2],"(par) (µmol photons m"^-2," s"^-1,")",sep = "")))+
-  theme_classic()+
-  theme(axis.text.x = element_text(angle = 90,
+  labs(y = expression(paste("Transcripts per million",sep = "",)),
+       x = "Time of Day")+
+  theme_classic(base_size = 14)+
+  theme(legend.title=element_blank(),
+        legend.justification = "left",
+        legend.key.size = unit(1, "cm"),
+        legend.box = "vertical",
+        legend.box.just = "left",
+        legend.spacing.y = unit(0, "cm"),
+        legend.box.spacing = unit(0.2, "cm"),
+        panel.spacing = unit(.2,"lines"),
+        axis.text.x = element_text(angle = 90,
                                    vjust = 0.5,
                                    hjust=1),
-        legend.position = "none",
-        axis.line.y.right = element_blank(),
-        axis.title.y.right = element_blank(),
-        axis.text.y.right = element_blank(),
-        axis.ticks.y.right = element_blank(),
-        strip.text.x = element_text(size = 6))+
-  guides(fill = guide_legend(title = "COG"))
-
+        axis.text = element_text(colour = "black"),
+        axis.ticks = element_line(colour = "black"),
+        panel.border = element_rect(linewidth = .2,
+                                    colour = "black",
+                                    fill = NA),
+        strip.background.x =  element_rect(colour = NA,
+                                           fill = NA),
+        strip.text.x = element_text(face = "bold",
+                                    size = 8.2),
+        legend.position = "none")+
+  guides(linetype = guide_legend(title = "Day"),
+         color = "none")
 
 p7
 
-ggsave("COG_Class_plots/COG_v_light_plot2.png",width = 8,height = 7.5,dpi = 300)
+file_name_vec <- paste("COG_Class_plots/","COG_plot2.png",sep = "")
+
+ggsave(file_name_vec,width = 8,height = 8,dpi = 300)
+```
+
+```{r}
+df.merged <- Eukaryota.merged
+
+Class.vec <- unique(df.merged$Class)
+n <- length(Class.vec)
+
+day.vec <- paste(meta.data$SampleID,"_quant",sep = "")
+m <- length(day.vec)
+
+for(i in 1:n){ #Looping through the Classes to count the occurrences.
+  
+  Class.filter <- df.merged$Class == Class.vec[i]
+  df.temp <- df.merged[Class.filter,]
+  
+  for(j in 1:m){ #Looping through the sampling time points.
+    
+   if(i == 1 & j == 1){ #Sets up an empty data.frame to input the data
+     
+     df.count <- data.frame(matrix(ncol = m, nrow = n))
+     names(df.count) <- meta.data$SampleName
+     
+     df.count <- cbind(df.count,Class.vec)
+   }
+    
+    # df.count[i,j] <- sum(df.temp[,day.vec[j]])/sum(df.merged[,day.vec[j]])
+    df.count[i,j] <- sum(df.temp[,day.vec[j]])
+    
+  }
+}
+
+df.merged2 <- df.merged[df.merged$Class != "Unclassified",]
+
+top5.vec <- names(table(df.merged2$Class)[order(-table(df.merged2$Class))[1:6]])
+
+top5.filter <- df.count$Class.vec %in% c(top5.vec,"Unclassified")
+
+df.top5 <- df.count[top5.filter,]
+df.other <- df.count[!top5.filter,]
+
+df.count2 <- rbind(df.top5,c(colSums(df.other[,1:24]),"Other"))
+
+dfOut <- pivot_longer(df.count2,
+                      all_of(meta.data$SampleName),
+                      names_to = "Day",
+                      values_to = "Count") %>% 
+  mutate(Count = as.numeric(Count))
+
+dfOut$Day <- substring(dfOut$Day,1,nchar(dfOut$Day)-1)
+
+df.summ <- summarySE(data = dfOut, "Count",
+                     groupvars = c("Day","Class.vec"))
+
+Day.Time <- meta.data[,c("AssemblyGroup","datetime","par","Day.num","ToD")] %>% 
+  distinct(AssemblyGroup, .keep_all = TRUE)
+
+names(Day.Time)[names(Day.Time) == "AssemblyGroup"] <- "Day"
+
+dfOut2 <- merge(df.summ,Day.Time,by = "Day")
+
+order.vec <- c("Cryptophyceae", "Prymnesiophyceae", "Dinophyceae", "Bacillariophyta", "Dictyochophyceae", "Other", "Unclassified" ,"Pyramimonadales")
+
+order.idx <-c("A","B","C","D","E","F","G","H")
+
+ToD.vec <- c("morning",
+               "afternoon",
+               "evening",
+               "night")
+
+for(i in 1:length(dfOut2$Class.vec)){
+  if(i == 1){
+    vec <- rep(NA,length(dfOut2$Class.vec))
+    vec2 <- rep(NA,nrow(dfOut2))
+  }
+  
+  vec[i] <- order.idx[order.vec == dfOut2$Class.vec[i]]
+  vec2[i] <- (1:length(ToD.vec))[ToD.vec == dfOut2$ToD[i]]
+  
+  if(i == length(dfOut2$Class.vec)){
+    dfOut2 <- cbind(dfOut2,vec,vec2)
+    names(dfOut2)[names(dfOut2) == "vec2"] <- "ToD.number"
+  }
+}
+
+names(order.vec) <- order.idx
+
+# p8 <- ggplot(data = dfOut2)+
+#   geom_line(aes(x = log(par,2),
+#                 y = Count,
+#                 linetype = Day.num))+
+#   geom_point(aes(x = log(par,2),
+#                 y = Count,))+
+#   geom_errorbar(aes(x = log(par,2),
+#                     y = Count,
+#                     ymax = Count+sd,
+#                     ymin = Count-sd))+
+#   facet_wrap(facets = "vec",
+#              nrow = 2,
+#              ncol = 4,
+#              #scales = "free_y",
+#              labeller = function(variable,value){return(order.vec[value])})+
+#   labs(y = "Transcripts per million",
+#        x = expression(paste("log"[2],"(par) (µmol photons m"^-2," s"^-1,")",sep = "")))+
+#   theme_classic(base_size = 14)+
+#   theme(legend.title=element_blank(),
+#         legend.justification = "left",
+#         legend.key.size = unit(1, "cm"),
+#         legend.box = "vertical",
+#         legend.box.just = "left",
+#         legend.spacing.y = unit(0, "cm"),
+#         legend.box.spacing = unit(0.2, "cm"),
+#         panel.spacing = unit(.2,"lines"),
+#         axis.text.x = element_text(angle = 90,
+#                                    vjust = 0.5,
+#                                    hjust=1),
+#         axis.text = element_text(colour = "black"),
+#         axis.ticks = element_line(colour = "black"),
+#         panel.border = element_rect(linewidth = .2,
+#                                     colour = "black",
+#                                     fill = NA),
+#         strip.background.x =  element_rect(colour = NA,
+#                                            fill = NA),
+#         strip.text.x = element_text(face = "bold",
+#                                     size = 12),
+#         legend.position = "none")+
+#   guides(linetype = guide_legend(title = "Day"),
+#          color = "none")
+# 
+# p8
+
+p8 <- ggplot(data = dfOut2)+
+  geom_line(aes(y = Count,
+                x = ToD.number,
+                linetype = Day.num))+
+  geom_point(aes(y = Count,
+                 x = ToD.number))+
+  geom_errorbar(aes(y = Count,
+                    x = ToD.number,
+                    ymin = Count+sd,
+                    ymax = Count-sd,
+                    width = .2))+
+  scale_x_continuous(breaks = 1:4,
+                     labels = ToD.vec)+
+  facet_wrap(facets = "vec",
+             nrow = 2,
+             ncol = 4,
+             #scales = "free_y",
+             labeller = function(variable,value){return(order.vec[value])})+
+  labs(y = "Transcripts per million",
+       x = "Time of Day")+
+  theme_classic(base_size = 14)+
+  theme(legend.title=element_blank(),
+        legend.justification = "left",
+        legend.key.size = unit(1, "cm"),
+        legend.box = "vertical",
+        legend.box.just = "left",
+        legend.spacing.y = unit(0, "cm"),
+        legend.box.spacing = unit(0.2, "cm"),
+        panel.spacing = unit(.2,"lines"),
+        axis.text.x = element_text(angle = 90,
+                                   vjust = 0.5,
+                                   hjust=1),
+        axis.text = element_text(colour = "black"),
+        axis.ticks = element_line(colour = "black"),
+        panel.border = element_rect(linewidth = .2,
+                                    colour = "black",
+                                    fill = NA),
+        strip.background.x =  element_rect(colour = NA,
+                                           fill = NA),
+        strip.text.x = element_text(face = "bold",
+                                    size = 12),
+        legend.position = "none")+
+  guides(linetype = guide_legend(title = "Day"),
+         color = "none")
+
+p8
+
+file_name_vec <- paste("COG_Class_plots/","Class_plot2_fixed.png",sep = "")
+
+ggsave(file_name_vec,width = 8,height = 5,dpi = 300)
 ```
 
 Initial exploration of the KEGG data, I found that there are so many different KEGGS if I use the first category in the string of the KEGG's after separating them.
@@ -1319,5 +1598,104 @@ for(i in 1:nrow(df.merged)){
 n_KEGG
 n_GOs
 n_PFAMs
+
+```
+
+```{r}
+df.merged <- Eukaryota.merged
+
+day.vec <- paste(meta.data$SampleID,"_quant",sep = "")
+n <- length(day.vec)
+
+for(i in 1:n){
+  
+  
+}
+
+df.count2 <- dfcount
+
+order.vec <- c("Day1_morning",
+               "Day1_afternoon",
+               "Day1_evening",
+               "Day1_night",
+               "Day2_morning",
+               "Day2_afternoon",
+               "Day2_evening",
+               "Day2_night")
+
+dfOut <- pivot_longer(df.count2,
+                      all_of(meta.data$SampleName),
+                      names_to = "Day",
+                      values_to = "Count") %>% 
+  mutate(Count = as.numeric(Count))
+
+dfOut$Day <- substring(dfOut$Day,1,nchar(dfOut$Day)-1)
+
+df.summ <- summarySE(data = dfOut, "Count",
+                     groupvars = c("Day"))
+
+Day.Time <- meta.data[,c("AssemblyGroup","datetime")] %>% 
+  distinct(AssemblyGroup, .keep_all = TRUE)
+
+names(Day.Time)[names(Day.Time) == "AssemblyGroup"] <- "Day"
+
+dfOut2 <- merge(df.summ,Day.Time,by = "Day")
+
+for(i in 1:length(unique(dfOut2$Class.vec))){
+  filter <- dfOut2$Class.vec == unique(dfOut2$Class.vec)[i]
+  
+  dfTemp <- dfOut2[filter,] %>% 
+    mutate(norm.data = (Count-min(Count))/(max(Count)-min(Count)))
+  
+  if(i != 1){
+    dfOut3 <- rbind(dfTemp,dfOut3)
+  } else {
+    dfOut3 <- dfTemp
+  }
+}
+
+# p2 <- ggplot(data = dfOut3)+
+#   geom_line(aes(x = datetime,
+#                 y = norm.data,
+#                 color = Class.vec))+
+#   geom_point(aes(x = datetime,
+#                 y = norm.data,
+#                 color = Class.vec))+
+#   scale_x_continuous(breaks = unique(meta.data$datetime),
+#                      labels = unique(meta.data$AssemblyGroup))+
+#   theme(axis.text.x = element_text(angle = 90,
+#                                    vjust = 0.5,
+#                                    hjust=1))
+# 
+# p2
+
+p9 <- ggplot(data = dfOut2)+
+  geom_line(aes(x = datetime,
+                y = Count,
+                color = Class.vec))+
+  geom_point(aes(x = datetime,
+                y = Count,
+                color = Class.vec))+
+  geom_errorbar(aes(x = datetime,
+                    y = Count,
+                    ymax = Count+sd,
+                    ymin = Count-sd))+
+  facet_wrap(facets = "Class.vec",
+             nrow = 3,
+             ncol = 4,
+             scales = "free_y")+
+  scale_x_continuous(breaks = unique(meta.data$datetime),
+                     labels = unique(meta.data$AssemblyGroup))+
+  labs(title = "Relative TPM per day",
+       y = "TPM per class / total TPM per day",
+       x = "Time of sample")+
+  theme_classic()+
+  theme(axis.text.x = element_text(angle = 90,
+                                   vjust = 0.5,
+                                   hjust=1),
+        legend.position = "none")
+
+p9
+
 
 ```
