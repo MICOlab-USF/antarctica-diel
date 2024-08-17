@@ -16,6 +16,8 @@ for(i in 1:nrow(Eukaryota_short)){
     SampleID <- names(Eukaryota_short[i,2:25])
     
     seq_vec <- NA
+    seq_df <- cbind.data.frame(unique(df_meta$AssemblyGroup),unique(df_meta$par))
+    names(seq_df) <- c("AssemblyGroup","par")
     n <- 1
   }
   vec <- as.numeric(Eukaryota_short[i,2:25])
@@ -31,14 +33,26 @@ for(i in 1:nrow(Eukaryota_short)){
   
   lm_vec <- lm(vec~par,dfOut)
   
-  if(summary(lm_vec)$r.squared > .90 & sum(dfOut$vec > 0) > 2){
+  if(summary(lm_vec)$r.squared > .95 & sum(dfOut$vec > 0) > 2){
     seq_vec[n] <- Eukaryota_short[i,1]
+    
+    vec1 <- dfOut$vec
+    
+    seq_df <- data.frame(cbind.data.frame(seq_df,vec1))
+    names(seq_df)[names(seq_df) == "vec1"] <- seq_vec[n]
+    
     n <- n+1
     
     create_plot(dfOut$par,dfOut$vec,lm_vec)
   }
   
+  if(i%%1000 == 0){
+    print(paste("Row", i))
+    print(Sys.time() - time1)
+  }
+  
   if(i == nrow(Eukaryota_short)){
+    print("Finished")
     print(Sys.time() - time1)
   }
 }
