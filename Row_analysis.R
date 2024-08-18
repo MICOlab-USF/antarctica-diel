@@ -3,24 +3,24 @@ create_plot = function(x_vec,y_vec,lm_vec){
   abline(lm_vec)
 }
 
-Eukaryota_short <- Eukaryota.merged[1:10000,]
+Input_data <- Eukaryota.merged[1:1000,]
 
-for(i in 1:nrow(Eukaryota_short)){
+for(i in 1:nrow(Input_data)){
   if(i == 1){
     time1 <- Sys.time()
-    names(Eukaryota_short) <- unlist(lapply(names(Eukaryota_short),
-                                            function(x){unlist(strsplit(x,
-                                                                        split = "_",
-                                                                        fixed = TRUE))[1]}))
+    names(Input_data) <- unlist(lapply(names(Input_data),
+                                       function(x){unlist(strsplit(x,
+                                                                   split = "_",
+                                                                   fixed = TRUE))[1]}))
     df_meta <- meta.data[,c("SampleID","par","AssemblyGroup")]
-    SampleID <- names(Eukaryota_short[i,2:25])
-    
+    SampleID <- names(Input_data[i,2:25])
+
     seq_vec <- NA
     seq_df <- cbind.data.frame(unique(df_meta$AssemblyGroup),unique(df_meta$par))
     names(seq_df) <- c("AssemblyGroup","par")
     n <- 1
   }
-  vec <- as.numeric(Eukaryota_short[i,2:25])
+  vec <- as.numeric(Input_data[i,2:25])
   
   
   df.temp <- merge(cbind.data.frame(vec,SampleID),df_meta,by = "SampleID")
@@ -34,7 +34,7 @@ for(i in 1:nrow(Eukaryota_short)){
   lm_vec <- lm(vec~par,dfOut)
   
   if(summary(lm_vec)$r.squared > .95 & sum(dfOut$vec > 0) > 2){
-    seq_vec[n] <- Eukaryota_short[i,1]
+    seq_vec[n] <- Input_data[i,1]
     
     vec1 <- dfOut$vec
     
@@ -51,8 +51,26 @@ for(i in 1:nrow(Eukaryota_short)){
     print(Sys.time() - time1)
   }
   
-  if(i == nrow(Eukaryota_short)){
+  if(i == nrow(Input_data)){
     print("Finished")
     print(Sys.time() - time1)
   }
 }
+
+
+
+seq_df <- read.csv("CSV_files/Eukaryota_row_reg.csv")
+
+filter <- Eukaryota.merged$SequenceID %in% names(seq_df)
+
+Eukaryota_light <- Eukaryota.merged[filter,]
+
+dfOut <- Eukaryota_light
+
+# Create a bar plot
+ggplot(dfOut, aes(x = COG_category))+
+  geom_bar()+
+  labs(title = "Class Distribution",
+       x = "Class",
+       y = "Count")+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
