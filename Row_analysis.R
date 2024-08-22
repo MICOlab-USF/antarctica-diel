@@ -3,7 +3,9 @@ create_plot = function(x_vec,y_vec,lm_vec){
   abline(lm_vec)
 }
 
-Input_data <- Eukaryota.merged[1:1000,]
+
+# Input_data <- Eukaryota.merged[1:1000,]
+Input_data <- read.csv("CSV_files/Bacteria.subsection.TPM.csv")
 
 for(i in 1:nrow(Input_data)){
   if(i == 1){
@@ -60,17 +62,36 @@ for(i in 1:nrow(Input_data)){
 
 
 seq_df <- read.csv("CSV_files/Eukaryota_row_reg.csv")
-
 filter <- Eukaryota.merged$SequenceID %in% names(seq_df)
-
 Eukaryota_light <- Eukaryota.merged[filter,]
-
 dfOut <- Eukaryota_light
 
+
+
+# seq_df <- read.csv("CSV_files/Bacteria_row_reg.csv")
+# Bacteria.TFA <- read.csv("CSV_files/Bacteria.TFA_NoRep.csv")
+# 
+# filter <- Bacteria.TFA$SequenceID %in% names(seq_df)
+# Bacteria_light <- Bacteria.TFA[filter,]
+# 
+# dfOut <- Bacteria_light
+
 # Create a bar plot
-ggplot(dfOut, aes(x = COG_category))+
-  geom_bar()+
+ggplot(dfOut, aes(x = Class))+
+  geom_bar(aes(y = after_stat(count)/sum(after_stat(count))))+
   labs(title = "Class Distribution",
        x = "Class",
        y = "Count")+
   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+# ggsave("Light_correlated_Class.png",dpi = 300,height = 5, width = 6)
+
+# Create a bar plot
+ggplot(Eukaryota.merged, aes(x = Class))+
+  geom_bar(aes(y = after_stat(count)/sum(after_stat(count))))+
+  labs(title = "Class Distribution",
+       x = "Class",
+       y = "Count")+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+# ggsave("All_Class.png",dpi = 300,height = 5, width = 6)
