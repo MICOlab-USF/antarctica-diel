@@ -1,0 +1,199 @@
+---
+title: "Row_analysis"
+author: "Andreas Norlin"
+date: "2024-08-22"
+output: html_document
+---
+
+```{r setup, include=T}
+knitr::opts_chunk$set(echo = TRUE)
+
+#rm(list = ls())
+
+package.list <- c("dplyr","tidyverse","ggplot2","lemon","vegan","Rmisc","lubridate")
+
+if(!all(package.list %in% installed.packages()[,"Package"])){
+  install.packages(package.list[!(package.list %in% installed.packages()[,"Package"])])
+}
+
+library(dplyr)
+library(tidyverse)
+library(ggplot2)
+library(lemon)
+library(vegan)
+library(Rmisc)
+library(lubridate)
+
+#Loading the meta.data: meta.data1 is the Assmebly group and the sequencing ID (sample ID),
+#meta.data2 is the data about sampling time and site.
+
+meta.data1 <- read.csv("CSV_files/dielRNA_eukrythmic.tsv", sep = "\t")
+meta.data2 <- read.csv("sample_metadata.csv") %>% 
+  mutate(Sample_ID = paste("HM",Sample_ID,sep = ""))
+
+names(meta.data2)[names(meta.data2) == "Sample_ID"] <- "SampleID"
+
+#Combining meta.data1 and meta.data2 and making the lubri string a data + time saved in datetime
+meta.data <- merge(meta.data1,meta.data2,by = "SampleID") %>% 
+  mutate(datetime = ymd(substring(lubri,1,10))+hms(substring(lubri,12,19)))
+
+meta.data <- separate(meta.data, col = AssemblyGroup, into = c("Day.num","ToD"),sep = "_",remove = FALSE, fill = "right", extra = "drop")
+
+# meta.data$lubri <- with_tz(mdy_hms(meta.data$datetime, tz = "UTC"),
+#                            tz = "America/Santiago")
+
+COG_categories <- read.csv("CSV_files/COG_categories.csv",sep = ",")
+
+Eukaryota.merged <- read.csv("CSV_files/Eukaryota.merged.csv")
+
+par1 <- read.delim("NBP2113pguv.d342",  sep = " ", header =FALSE)
+par2<- read.delim("NBP2113pguv.d343",  sep = " ", header =FALSE)
+par3<- read.delim("NBP2113pguv.d344",  sep = " ", header =FALSE)
+
+par = rbind(par1, par2, par3)[-1,c(1,2,3,10)]
+names(par) <- c("juliendatetime","date", "time", "par")
+
+partime <- par %>% 
+  separate(juliendatetime, c("yearday","hour", "min", "sec"), sep = ":" ) %>% 
+  unite(utctime, hour, min, sec, sep=":")  %>% 
+  mutate(utcdatetime = paste(date, utctime))
+
+partime$lubri <- with_tz(mdy_hms(partime$utcdatetime, tz = "UTC"),
+                         tz = "America/Santiago")
+
+for(i in 1:nrow(meta.data)){
+
+  filter.above <- partime$lubri >= meta.data$datetime[i]
+  filter.below <- partime$lubri < meta.data$datetime[i]
+  
+  vec.above <- partime[partime$lubri == min(partime$lubri[filter.above]),]
+  vec.below <- partime[partime$lubri == max(partime$lubri[filter.below]),]
+  
+  meta.data$par[i] <- mean(vec.above$par,vec.below$par)
+  
+}
+
+create_plot = function(x_vec,y_vec,lm_vec){
+  plot(x_vec,y_vec)
+  abline(lm_vec)
+}
+```
+
+
+```{r}
+Input_data <- Eukaryota.merged[1:1000,]
+# Input_data <- read.csv("CSV_files/Bacteria.subsection.TPM.csv")
+
+for(i in 1:nrow(Input_data)){
+  if(i == 1){
+    time1 <- Sys.time()
+    names(Input_data) <- unlist(lapply(names(Input_data),
+                                       function(x){unlist(strsplit(x,
+                                                                   split = "_",
+                                                                   fixed = TRUE))[1]}))
+    df_meta <- meta.data[,c("SampleID","par","AssemblyGroup")]
+    SampleID <- names(Input_data[i,2:25])
+
+    seq_vec <- NA
+    seq_df <- cbind.data.frame(unique(df_meta$AssemblyGroup),unique(df_meta$par))
+    names(seq_df) <- c("AssemblyGroup","par")
+    n <- 1
+  }
+  vec <- as.numeric(Input_data[i,2:25])
+  
+  
+  df.temp <- merge(cbind.data.frame(vec,SampleID),df_meta,by = "SampleID")
+  
+  df.summ <- summarySE(data = df.temp, "vec",
+                       groupvars = c("AssemblyGroup"))
+  
+  dfOut <- merge(df.summ,df_meta,by = "AssemblyGroup") %>% 
+    distinct(AssemblyGroup, .keep_all = TRUE)
+  
+  lm_vec <- lm(vec~par,dfOut)
+  
+  if(summary(lm_vec)$r.squared > .95 & sum(dfOut$vec > 0) > 2){
+    seq_vec[n] <- Input_data[i,1]
+    
+    vec1 <- dfOut$vec
+    
+    seq_df <- data.frame(cbind.data.frame(seq_df,vec1))
+    names(seq_df)[names(seq_df) == "vec1"] <- seq_vec[n]
+    
+    n <- n+1
+    
+    #create_plot(dfOut$par,dfOut$vec,lm_vec)
+  }
+  
+  if(i%%5000 == 0){
+    print(paste("Row", i))
+    print(Sys.time() - time1)
+  }
+  
+  if(i == nrow(Input_data)){
+    print("Finished")
+    print(Sys.time() - time1)
+  }
+}
+```
+
+
+
+```{r}
+seq_df <- read.csv("CSV_files/Eukaryota_row_reg.csv")
+filter <- Eukaryota.merged$SequenceID %in% names(seq_df)
+Eukaryota_light <- Eukaryota.merged[filter,]
+dfOut <- Eukaryota_light
+
+
+# Create a bar plot
+ggplot(dfOut, aes(x = Class))+
+  geom_bar(aes(y = after_stat(count)/sum(after_stat(count))))+
+  labs(title = "Class Distribution",
+       x = "Class",
+       y = "Count")+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+# ggsave("Light_correlated_Class.png",dpi = 300,height = 5, width = 6)
+
+# Create a bar plot
+ggplot(Eukaryota.merged, aes(x = Class))+
+  geom_bar(aes(y = after_stat(count)/sum(after_stat(count))))+
+  labs(title = "Class Distribution",
+       x = "Class",
+       y = "Count")+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+# ggsave("All_Class.png",dpi = 300,height = 5, width = 6)
+```
+
+
+```{r}
+seq_df <- read.csv("CSV_files/Bacteria_row_reg.csv")
+Bacteria.TFA <- read.csv("CSV_files/Bacteria.TFA_NoRep.csv")
+
+filter <- Bacteria.TFA$SequenceID %in% names(seq_df)
+Bacteria_light <- Bacteria.TFA[filter,]
+
+dfOut <- Bacteria_light
+
+# Create a bar plot
+ggplot(dfOut, aes(x = Class))+
+  geom_bar(aes(y = after_stat(count)/sum(after_stat(count))))+
+  labs(title = "Class Distribution",
+       x = "Class",
+       y = "Count")+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+# ggsave("Light_correlated_Class.png",dpi = 300,height = 5, width = 6)
+
+# Create a bar plot
+ggplot(Bacteria.TFA, aes(x = Class))+
+  geom_bar(aes(y = after_stat(count)/sum(after_stat(count))))+
+  labs(title = "Class Distribution",
+       x = "Class",
+       y = "Count")+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+# ggsave("All_Class.png",dpi = 300,height = 5, width = 6)
+```
