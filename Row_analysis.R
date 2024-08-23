@@ -4,8 +4,8 @@ create_plot = function(x_vec,y_vec,lm_vec){
 }
 
 
-# Input_data <- Eukaryota.merged[1:1000,]
-Input_data <- read.csv("CSV_files/Bacteria.subsection.TPM.csv")
+Input_data <- Eukaryota.merged[1:1000,]
+# Input_data <- read.csv("CSV_files/Bacteria.subsection.TPM.csv")
 
 for(i in 1:nrow(Input_data)){
   if(i == 1){

@@ -167,7 +167,6 @@ ggplot(Eukaryota.merged, aes(x = Class))+
 # ggsave("All_Class.png",dpi = 300,height = 5, width = 6)
 ```
 
-
 ```{r}
 seq_df <- read.csv("CSV_files/Bacteria_row_reg.csv")
 Bacteria.TFA <- read.csv("CSV_files/Bacteria.TFA_NoRep.csv")
