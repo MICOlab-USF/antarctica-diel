@@ -84,59 +84,55 @@ create_plot = function(x_vec,y_vec,lm_vec){
 Input_data <- Eukaryota.merged[1:1000,]
 # Input_data <- read.csv("CSV_files/Bacteria.subsection.TPM.csv")
 
-for(i in 1:nrow(Input_data)){
+vec_assembly <- unique(meta.data$AssemblyGroup)
+
+for(i in 1:length(vec_assembly)){
   if(i == 1){
-    time1 <- Sys.time()
     names(Input_data) <- unlist(lapply(names(Input_data),
                                        function(x){unlist(strsplit(x,
                                                                    split = "_",
                                                                    fixed = TRUE))[1]}))
+    
     df_meta <- meta.data[,c("SampleID","par","AssemblyGroup")]
-    SampleID <- names(Input_data[i,2:25])
-
-    seq_vec <- NA
-    seq_df <- cbind.data.frame(unique(df_meta$AssemblyGroup),unique(df_meta$par))
-    names(seq_df) <- c("AssemblyGroup","par")
-    n <- 1
-  }
-  vec <- as.numeric(Input_data[i,2:25])
-  
-  
-  df.temp <- merge(cbind.data.frame(vec,SampleID),df_meta,by = "SampleID")
-  
-  df.summ <- summarySE(data = df.temp, "vec",
-                       groupvars = c("AssemblyGroup"))
-  
-  dfOut <- merge(df.summ,df_meta,by = "AssemblyGroup") %>% 
-    distinct(AssemblyGroup, .keep_all = TRUE)
-  
-  lm_vec <- lm(vec~par,dfOut)
-  
-  if(summary(lm_vec)$r.squared > .95 & sum(dfOut$vec > 0) > 2){
-    seq_vec[n] <- Input_data[i,1]
     
-    vec1 <- dfOut$vec
-    
-    seq_df <- data.frame(cbind.data.frame(seq_df,vec1))
-    names(seq_df)[names(seq_df) == "vec1"] <- seq_vec[n]
-    
-    n <- n+1
-    
-    #create_plot(dfOut$par,dfOut$vec,lm_vec)
+    df_means <- Input_data$SequenceID
+    par_vec <- NA
+    time1 <- Sys.time()
   }
   
-  if(i%%5000 == 0){
-    print(paste("Row", i))
-    print(Sys.time() - time1)
-  }
+  df_temp <- Input_data[,meta.data$SampleID[meta.data$AssemblyGroup == vec_assembly[i]]]
   
-  if(i == nrow(Input_data)){
-    print("Finished")
+  meta_temp <- df_meta %>% 
+    distinct(AssemblyGroup,.keep_all = TRUE) %>% 
+    filter(AssemblyGroup == vec_assembly[i])
+  
+  par_vec[i] <- meta_temp$par
+  
+  vec <- rowMeans(df_temp)
+  df_means <- cbind.data.frame(df_means,vec)
+  
+  names(df_means)[i+1] <- vec_assembly[i]
+  
+  if(i == length(vec_assembly)){
+    # df_means <- as.data.frame(t(df_means))
+    names(df_means)[1] <- "SequenceID"
+    
+    df_means$r.squared <- apply(df_means[,2:9],1,function(row){summary(lm(row~par_vec))$r.squared})
+    df_means$n_nonzero <- apply(df_means[,2:9],1,function(row){sum(row > 0)})
+    
+    seq_df <- df_means[df_means$r.squared >.95 & df_means$n_nonzero > 2,]
+    
     print(Sys.time() - time1)
   }
 }
 ```
 
+
+```{r}
+Input_data <- Eukaryota.merged[1:1000,]
+# Input_data <- read.csv("CSV_files/Bacteria.subsection.TPM.csv")
+
+```
 
 
 ```{r}
