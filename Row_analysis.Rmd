@@ -136,8 +136,8 @@ Input_data <- Eukaryota.merged[1:1000,]
 
 
 ```{r}
-seq_df <- read.csv("CSV_files/Eukaryota_row_reg.csv")
-filter <- Eukaryota.merged$SequenceID %in% names(seq_df)
+# seq_df <- read.csv("CSV_files/Eukaryota_row_reg.csv")
+filter <- Eukaryota.merged$SequenceID %in% seq_df$SequenceID
 Eukaryota_light <- Eukaryota.merged[filter,]
 dfOut <- Eukaryota_light
 

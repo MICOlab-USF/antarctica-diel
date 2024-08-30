@@ -34,18 +34,18 @@ colors30 <- c(blue, purple, red, yellow, orange, green, "black")
 
 
 ```{r load_data}
-tpm <- read.csv("salmon.merged.TPM.subset5.csv") #transcripts per million
+tpm <- read.csv("CSV_files/salmon.merged.TPM.subset5.csv") #transcripts per million
 names(tpm)[1] <- "SequenceID" #rename sequence ID column to match annotation files
 
-counts <- read.csv("salmon.merged.numreads.subset5.csv")
+counts <- read.csv("CSV_files/salmon.merged.numreads.subset5.csv")
 names(counts)[1] <- "SequenceID"
 
-funtax <- read.csv("TaxonomicAndFunctionalAnnotations.csv", sep = "\t") #functional AND taxonomic annotation file 
+funtax <- read.csv("CSV_files/TaxonomicAndFunctionalAnnotations.csv", sep = "\t") #functional AND taxonomic annotation file 
 funtax <-  separate(funtax, full_classification, c("Domain","Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species"), sep = ";", fill = "right") #split "full_classification" column so that each classification level is its own column
 
-fun <- read.csv("full_function.csv", sep = "\t") #functional annotation only file  - has some extra information about functional annotation
+fun <- read.csv("CSV_files/full_function.csv", sep = "\t") #functional annotation only file  - has some extra information about functional annotation
 
-meta <- read.csv("dielRNA_eukrythmic.tsv", sep = "\t")
+meta <- read.csv("CSV_files/dielRNA_eukrythmic.tsv", sep = "\t")
 meta4join <- meta %>% select(SampleID, SampleName, AssemblyGroup)
 meta4join$SampleID <- paste0(meta4join$SampleID, "_quant")
 row.names(meta4join) <- meta4join$SampleID
@@ -185,29 +185,38 @@ cogplot
 ```{r bact_kegg}
 library(stringi)
 
-funtax_bact_keggplot <- fun_tax_bact_relabund %>% select(c(SequenceID, KEGG_ko, Phylum, starts_with("HM"))) 
+funtax_bact_keggplot <- fun_tax_bact_relabund %>% select(c(SequenceID, KEGG_ko, Phylum, starts_with("HM")))
 funtax_bact_keggplot <-  separate(funtax_bact_keggplot, KEGG_ko, c("K1", "K2", "K3"), sep = ",", fill = "right") 
-funtax_bact_keggplot$K1 <- substr(funtax_bact_keggplot$K1, 4, 9) 
+funtax_bact_keggplot$K1 <- substr(funtax_bact_keggplot$K1, 4, 9)
 
 Ks <- unique(funtax_bact_keggplot$K1)[-3]
 
 koslist <- Ks
 
- paths <- character(length=0)
- for(i in 1:length(koslist)) {
-   pathway <- system(paste0("curl https://rest.kegg.jp/link/pathway/", koslist[[i]]), intern=TRUE)
-    if (length(pathway) == 0) {
-      paths[[i]]<- "NA"
-    } else if (length(pathway) == 1) {
-      paths[[i]] <- stri_sub(pathway[[1]], 16)
-    } else {
-      l <- length(pathway)
-      paths[[i]] <- stri_sub(pathway[[2]], 16)
-    }
- }
- 
+kegg_API <- function(kegg){
+  pathway <- system(paste0("curl https://rest.kegg.jp/link/pathway/", kegg), intern=TRUE)
+  l <- length(pathway)
+
+  ifelse(l != 0,
+         paths[[i]] <- stri_sub(pathway[[l]], 16),
+         paths[[i]]<- "NA")
+}
+
+paths <- unlist(lapply(koslist,kegg_API))
+
+ # paths <- character(length=0)
+ # for(i in 1:length(koslist)) {
+ #   pathway <- system(paste0("curl https://rest.kegg.jp/link/pathway/", koslist[[i]]), intern=TRUE)
+ #    if (length(pathway) != 0) {
+ #      l <- length(pathway)
+ #      paths[[i]] <- stri_sub(pathway[[l]], 16)
+ #    } else {
+ #      paths[[i]]<- "NA"
+ #    }
+ # }
+
  keggpaths <- data.frame(Ks, paths)
- kegg$path<-paths
+ # kegg$path<-paths
 
 ## pathway ids
 
@@ -243,12 +252,25 @@ funtax_bact_keggplot$SampleName <- factor(funtax_bact_keggplot$SampleName, level
 
 
 ```{r}
-funtax_bact_keggplot_min1 <- funtax_bact_keggplot %>% select(ko, SampleID, counts, SampleName) %>% group_by(ko, SampleID, SampleName) %>% mutate(kosum = sum(counts)) %>% dplyr::slice(1) %>% ungroup()
+funtax_bact_keggplot_min1 <- funtax_bact_keggplot %>%
+  select(ko, SampleID, counts, SampleName) %>%
+  group_by(ko, SampleID, SampleName) %>%
+  mutate(kosum = sum(counts)) %>%
+  dplyr::slice(1) %>%
+  ungroup()
 
 funtax_bact_keggplot_min1$ko[funtax_bact_keggplot_min1$kosum < 0.5] <- "z< 0.5% abund."
 
-koplot<- funtax_bact_keggplot_min1 %>% ggplot(aes(fill=ko, y=kosum, x=SampleName)) + 
-    geom_bar(position="stack", stat="identity") + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) + scale_fill_manual(values = colors30)
+koplot<- funtax_bact_keggplot_min1 %>% 
+  ggplot(aes(fill=ko,
+             y=kosum,
+             x=SampleName)) + 
+    geom_bar(position="stack",
+             stat="identity") + 
+  theme(axis.text.x = element_text(angle = 90,
+                                   vjust = 0.5,
+                                   hjust=1)) + 
+  scale_fill_manual(values = colors30)
 
 koplot
 ```
