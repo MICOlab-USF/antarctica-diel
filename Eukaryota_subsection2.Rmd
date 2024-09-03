@@ -278,20 +278,64 @@ KEGG_columns <- paste("KEGG",1:n_KEGG,sep = "")
 df.merged <- separate(df.merged,col = KEGG_ko,into = KEGG_columns,
                       sep = ",", remove = FALSE, fill = "right", extra = "drop")
 
-PFAMs_columns <- paste("PFAMs",1:n_PFAMs,sep = "")
-
-df.merged <- separate(df.merged,col = PFAMs,into = PFAMs_columns,
-                      sep = ",", remove = FALSE, fill = "right", extra = "drop")
-
-GOs_columns <- paste("GOs",1:n_GOs,sep = "")
-
-df.merged <- separate(df.merged,col = GOs,into = GOs_columns,
-                      sep = ",", remove = FALSE, fill = "right", extra = "drop")
+# PFAMs_columns <- paste("PFAMs",1:n_PFAMs,sep = "")
+# 
+# df.merged <- separate(df.merged,col = PFAMs,into = PFAMs_columns,
+#                       sep = ",", remove = FALSE, fill = "right", extra = "drop")
+# 
+# GOs_columns <- paste("GOs",1:n_GOs,sep = "")
+# 
+# df.merged <- separate(df.merged,col = GOs,into = GOs_columns,
+#                       sep = ",", remove = FALSE, fill = "right", extra = "drop")
 
 n_KEGG
 n_GOs
 n_PFAMs
 
+```
+```{r}
+library(stringi)
+
+Ks <- unique(unlist(df.merged[,KEGG_columns]))[!unique(unlist(df.merged[,KEGG_columns])) %in% c("-",NA)]
+
+Time1 <- Sys.time()
+Ks <- Ks[1:50]
+
+koslist <- Ks
+
+# kegg_API <- function(kegg){
+#   pathway <- system(paste0("curl https://rest.kegg.jp/link/pathway/", kegg), intern=TRUE)
+#   l <- length(pathway)
+# 
+#   ifelse(l != 0,
+#          stri_sub(pathway[[l]], 16),
+#          "NA")
+# }
+# 
+# paths <- unlist(lapply(koslist,kegg_API))
+
+paths <- character(length=0)
+for(i in 1:length(koslist)) {
+  pathway <- system(paste0("curl https://rest.kegg.jp/link/pathway/", koslist[[i]]), intern=TRUE)
+   if (length(pathway) != 0) {
+     l <- length(pathway)
+     paths[[i]] <- stri_sub(pathway[[l]], 16)
+   } else {
+     paths[[i]] <- "NA"
+   }
+  
+  if(i %% 100 == 0){
+    print(paste("Row", i))
+    print(Sys.time() - Time1)
+  }
+}
+
+keggpaths <- data.frame(Ks, paths)
+names(keggpaths) <- c("K1", "ko")
+
+# write.csv(keggpaths,"KO_pathway_Euk.csv",row.names = FALSE)
+
+Sys.time() - Time1
 ```
 
 

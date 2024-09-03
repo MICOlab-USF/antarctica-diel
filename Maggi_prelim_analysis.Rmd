@@ -190,6 +190,7 @@ funtax_bact_keggplot <-  separate(funtax_bact_keggplot, KEGG_ko, c("K1", "K2", "
 funtax_bact_keggplot$K1 <- substr(funtax_bact_keggplot$K1, 4, 9)
 
 Ks <- unique(funtax_bact_keggplot$K1)[-3]
+Ks <- Ks[1:50]
 
 koslist <- Ks
 
@@ -198,8 +199,8 @@ kegg_API <- function(kegg){
   l <- length(pathway)
 
   ifelse(l != 0,
-         paths[[i]] <- stri_sub(pathway[[l]], 16),
-         paths[[i]]<- "NA")
+         stri_sub(pathway[[l]], 16),
+         "NA")
 }
 
 paths <- unlist(lapply(koslist,kegg_API))
