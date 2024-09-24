@@ -1,0 +1,212 @@
+---
+title: "Diel_Bacteria_sym"
+author: "Andreas Norlin"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+rm(list = ls())
+
+package.list <- c("dplyr","tidyverse","ggplot2",
+                  "lemon","vegan","Rmisc",
+                  "lubridate","phyloseq","patchwork",
+                  "DESeq2")
+
+if(!all(package.list %in% installed.packages()[,"Package"])){
+  install.packages(package.list[!(package.list %in% installed.packages()[,"Package"])])
+}
+
+library(dplyr)
+library(tidyverse)
+library(ggplot2)
+library(lemon)
+library(vegan)
+library(Rmisc)
+library(lubridate)
+
+library(phyloseq)
+library(patchwork)
+library(DESeq2)
+
+#Loading the meta.data: meta.data1 is the Assmebly group and the sequencing ID (sample ID),
+#meta.data2 is the data about sampling time and site.
+
+meta.data1 <- read.csv("CSV_files/dielRNA_eukrythmic.tsv", sep = "\t")
+meta.data2 <- read.csv("sample_metadata.csv") %>% 
+  mutate(Sample_ID = paste("HM",Sample_ID,sep = ""))
+
+names(meta.data2)[names(meta.data2) == "Sample_ID"] <- "SampleID"
+
+#Combining meta.data1 and meta.data2 and making the lubri string a data + time saved in datetime
+meta.data <- merge(meta.data1,meta.data2,by = "SampleID") %>% 
+  mutate(datetime = ymd(substring(lubri,1,10))+hms(substring(lubri,12,19)))
+
+meta.data <- separate(meta.data, col = AssemblyGroup, into = c("Day.num","ToD"),sep = "_",remove = FALSE, fill = "right", extra = "drop")
+
+# meta.data$lubri <- with_tz(mdy_hms(meta.data$datetime, tz = "UTC"),
+#                            tz = "America/Santiago")
+
+COG_categories <- read.csv("COG_categories.csv",sep = ",")
+
+Full.merged <- read.csv("CSV_files/Full.merged.csv")
+
+par1 <- read.delim("NBP2113pguv.d342",  sep = " ", header =FALSE)
+par2<- read.delim("NBP2113pguv.d343",  sep = " ", header =FALSE)
+par3<- read.delim("NBP2113pguv.d344",  sep = " ", header =FALSE)
+
+par = rbind(par1, par2, par3)[-1,c(1,2,3,10)]
+names(par) <- c("juliendatetime","date", "time", "par")
+
+partime <- par %>% 
+  separate(juliendatetime, c("yearday","hour", "min", "sec"), sep = ":" ) %>% 
+  unite(utctime, hour, min, sec, sep=":")  %>% 
+  mutate(utcdatetime = paste(date, utctime))
+
+partime$lubri <- with_tz(mdy_hms(partime$utcdatetime, tz = "UTC"),
+                         tz = "America/Santiago")
+
+for(i in 1:nrow(meta.data)){
+
+  filter.above <- partime$lubri >= meta.data$datetime[i]
+  filter.below <- partime$lubri < meta.data$datetime[i]
+  
+  vec.above <- partime[partime$lubri == min(partime$lubri[filter.above]),]
+  vec.below <- partime[partime$lubri == max(partime$lubri[filter.below]),]
+  
+  meta.data$par[i] <- mean(vec.above$par,vec.below$par)
+  
+}
+
+m <- 1
+time.int <- ms("05.00")
+for(i in 1:nrow(partime)){
+  if(i == 1){
+    vec <- NA
+    vec.slide <- NA
+    n <- 1
+  }
+  
+  test.vec <- partime$lubri[i] - partime$lubri[m]
+  
+  if(test.vec > time.int){
+    m <- i
+    
+    vec[n] <- i
+    
+    n <- n+1
+  }
+  
+}
+
+partime <- partime[vec,]
+```
+
+
+```{r Loading and cleaning the raw data}
+# tax.func <- read.csv("CSV_files/TaxonomicAndFunctionalAnnotations.csv", sep = "\t")
+# 
+# #Splitting the column with full_classification into seperate columns
+# tax.func <- separate(tax.func,
+#                      col = full_classification,
+#                      into = c("Domain","Supergroup","Division","Class","Order","Family","Genus","Species"),
+#                      sep = "; ",
+#                      remove = FALSE,
+#                      fill = "right",
+#                      extra = "drop")
+# 
+# #Cleaning up data by removing blank spaces at the beginning of entries in the newly separated columns.
+# Class_hierarchy <- c("Domain","Supergroup","Division","Class","Order","Family","Genus","Species")
+# 
+# for(i in 1:length(Class_hierarchy)){
+#   Col_filter <- names(tax.func) == Class_hierarchy[i]
+#   
+#   tax.func[,Col_filter] <- ifelse(substring(tax.func[,Col_filter],1,1) == " ",
+#                                           substring(tax.func[,Col_filter],2),
+#                                           tax.func[,Col_filter])
+# }
+# 
+# #Removing the .p after sequence names, in order to remove duplicate sequences later.
+# tax.func$SequenceID <- unlist(lapply(tax.func$SequenceID,
+#                                       function(x){unlist(strsplit(x,split = ".",fixed = TRUE))[1]}))
+# 
+# salmon.TPM <- read.csv("CSV_files/salmon.merged.TPM.subset5.csv")
+# filter <- salmon.TPM$Name %in% tax.func$SequenceID
+# 
+# Full.TPM <- salmon.TPM[filter,]
+# 
+# #Filtering out the sequences present in the Taxonomy and functional annotations data, but not in the TPM
+# filter <- tax.func$SequenceID %in% Full.TPM$Name
+# 
+# tax.func <- tax.func[filter,]
+# 
+# #Seperates sequences with a KEGG from the sequences that don't
+# filter <- tax.func$KEGG_ko != "-"
+# 
+# Full.KEGG <- tax.func[filter,]
+# Full.noKEGG <- tax.func[!filter,]
+# 
+# #Creates a filter for the sequences that have KEGGs to seperate COGs and noCOGs
+# filter1 <- Full.KEGG$COG_category == "-"
+# 
+# Full.KEGG.COG <- Full.KEGG[!filter1,] %>%
+#   distinct(SequenceID, .keep_all = TRUE)
+# 
+# Full.KEGG.noCOG <- Full.KEGG[filter1,] %>%
+#   distinct(SequenceID, .keep_all = TRUE)
+# 
+# #Removes sequences from noCOG that is present in COG
+# filter2 <- Full.KEGG.noCOG$SequenceID %in% Full.KEGG.COG$SequenceID
+# 
+# Full.KEGG <- rbind(Full.KEGG.COG,Full.KEGG.noCOG[!filter2,])
+# 
+# #Creates a filter for the sequences that doesn't have KEGGs to seperate COGs and noCOGs
+# filter1 <- Full.noKEGG$COG_category == "-"
+# 
+# Full.noKEGG.COG <- Full.noKEGG[!filter1,] %>%
+#   distinct(SequenceID, .keep_all = TRUE)
+# 
+# Full.noKEGG.noCOG <- Full.noKEGG[filter1,] %>%
+#   distinct(SequenceID, .keep_all = TRUE)
+# 
+# #Removes sequences from noCOG that is present in COG
+# filter2 <- Full.noKEGG.noCOG$SequenceID %in% Full.noKEGG.COG$SequenceID
+# 
+# Full.noKEGG <- rbind(Full.noKEGG.COG,Full.noKEGG.noCOG[!filter2,])
+# 
+# #Filtering Sequences in noKEGG that are present in KEGG
+# filter3 <- Full.noKEGG$SequenceID %in% Full.KEGG$SequenceID
+# 
+# Full.noRep <- rbind(Full.KEGG,Full.noKEGG[!filter3,])
+# 
+# write.csv(Full.noRep,"CSV_files/tax.func_NoRep.csv",row.names = F)
+# 
+# names(Full.TPM)[1] <- "SequenceID"
+# 
+# df.merged <- merge(Full.TPM,Full.noRep,by = "SequenceID")
+# 
+# write.csv(df.merged,"CSV_files/Full.merged.csv",row.names = F)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r Cleaning categories}
+
+Full.noRep$Class <- ifelse(substring(Full.noRep$Class,nchar(Full.noRep$Class)-7) == " (Class)",
+                           substring(Full.noRep$Class,1,nchar(Full.noRep$Class)-8),
+                           Full.noRep$Class) #Is this statement even needed?
+
+for(i in 1:length(Class_hierarchy)){
+  Col_filter <- names(df.merged) == Class_hierarchy[i]
+  row_filter <- is.na(df.merged[,Col_filter])
+
+  df.merged[row_filter,Col_filter] <- "Unclassified"
+}
+
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
