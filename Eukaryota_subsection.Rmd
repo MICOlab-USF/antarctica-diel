@@ -48,7 +48,7 @@ meta.data <- separate(meta.data, col = AssemblyGroup, into = c("Day.num","ToD"),
 # meta.data$lubri <- with_tz(mdy_hms(meta.data$datetime, tz = "UTC"),
 #                            tz = "America/Santiago")
 
-COG_categories <- read.csv("CSV_files/COG_categories.csv",sep = ",")
+COG_categories <- read.csv("COG_categories.csv",sep = ",")
 
 Eukaryota.merged <- read.csv("CSV_files/Eukaryota.merged.csv")
 
