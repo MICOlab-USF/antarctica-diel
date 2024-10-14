@@ -680,7 +680,7 @@ p1
 #          "NA")
 # }
 
-top_kos <- unique(Kmet_slice$path)
+top_kos <- level_vec
 
 name <- character(length=0)
 class <- character(length=0)
