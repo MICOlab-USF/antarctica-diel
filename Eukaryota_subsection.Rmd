@@ -12,7 +12,7 @@ Two meta data tables are loaded and merged together to get the HM (sample number
 After the meta data is loaded, the subsectioned dataset is loaded and the temporal resolution of the par data is decreased to get a smaller sized data set for running the code quicker.
 
 ```{r setup, include=T}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = FALSE)
 
 #rm(list = ls())
 
