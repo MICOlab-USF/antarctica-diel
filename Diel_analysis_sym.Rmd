@@ -58,7 +58,7 @@ meta.data <- separate(meta.data, col = AssemblyGroup, into = c("Day.num","ToD"),
 # meta.data$lubri <- with_tz(mdy_hms(meta.data$datetime, tz = "UTC"),
 #                            tz = "America/Santiago")
 
-COG_categories <- read.csv("COG_categories.csv",sep = ",")
+COG_categories <- read.csv("COG_categories.csv",sep = ";")
 
 Full.merged <- read.csv("CSV_files/Full.merged.csv")
 
@@ -524,7 +524,7 @@ p1 <- ggplot(dfOut2)+
 #                 alpha = 0.5))+
 #   scale_y_continuous(sec.axis = sec_axis(~.*scale, name = "Secondary Y-axis"))
 
-p2
+p1
 
 save_name <- "KO_plots/AllBact_topKO.png"
 ggsave(save_name,width = 10,height = 5,dpi = 300)
@@ -1459,7 +1459,7 @@ Euk_Orders <- unique(Euk.Sub$Order)
 n <- length(Euk_Orders)
 
 day_vec <- paste(meta.data$SampleID,"_quant",sep = "")
-m <- length(day.vec)
+m <- length(day_vec)
 
 for(i in 1:n){
   
@@ -1490,12 +1490,12 @@ Bact_Orders <- unique(Bact.Sub$Order)
 n <- length(Bact_Orders)
 
 day_vec <- paste(meta.data$SampleID,"_quant",sep = "")
-m <- length(day.vec)
+m <- length(day_vec)
 
 for(i in 1:n){
   
   Order_filter <- Bact.Sub$Order == Bact_Orders[i]
-  df_temp <- Euk.Sub[Order_filter,]
+  df_temp <- Bact.Sub[Order_filter,]
   
   for(j in 1:m){
     if(i == 1 & j == 1){
@@ -1551,12 +1551,14 @@ for(i in 1:Euk_length){
     df_reg[out_n,4] <- Bact_name
     df_reg[out_n,5] <- Euk_name
    
-    if(R2 >= .75){
+    if(R2 >= .4){
       
       plot(Bact_vec,
            Euk_vec,
            ylab = Euk_name,
-           xlab = Bact_name)
+           # ylab = topkos_w_info$class[topkos_w_info$top_kos == Euk_name],
+           xlab = Bact_name,
+             main = paste("R2 =",round(R2,3)))
 
       abline(lm_vec)
     }
@@ -1590,7 +1592,7 @@ for(i in 1:First_length){
   
   for(j in 1:Bact_length){
     
-    if(j == i){
+    if(j >= i){
       
     }else{
       Bact_vec <- unlist(dfOut[j,1:24])
@@ -1604,12 +1606,13 @@ for(i in 1:First_length){
       df_reg[out_n,2] <- Bact_name
       df_reg[out_n,3] <- Euk_name
      
-      if(R2 >= .9){
+      if(R2 >= .4  & lm_vec$coefficients[2] < 0){
         
         plot(Bact_vec,
              Euk_vec,
              ylab = Euk_name,
-             xlab = Bact_name)
+             xlab = Bact_name,
+             main = paste("R2 =",round(R2,3)))
   
         abline(lm_vec)
       }
@@ -1619,5 +1622,46 @@ for(i in 1:First_length){
     
   }
 }
+```
+
+```{r}
+
+df.merged <- Euk.Sub
+
+df.merged$K1_path <- Ko_path
+kegg.vec <- unique(df.merged$K1_path)
+
+filter <- grepl("C",df.merged$COG_category)
+df.merged <- df.merged[filter,]
+
+n <- length(kegg.vec)
+
+# df.merged <- df.merged[df.merged$K1_path != "Unclassified",]
+
+day.vec <- paste(meta.data$SampleID,"_quant",sep = "")
+m <- length(day.vec)
+
+for(i in 1:n){ #Looping through the Classes to count the occurrences.
+  
+  kegg.filter <- df.merged$K1_path == kegg.vec[i]
+  df.temp <- df.merged[kegg.filter,]
+  
+  for(j in 1:m){ #Looping through the sampling time points.
+    
+   if(i == 1 & j == 1){ #Sets up an empty data.frame to input the data
+     
+     df.count <- data.frame(matrix(ncol = m, nrow = n))
+     names(df.count) <- meta.data$SampleName
+     
+     df.count <- cbind(df.count,kegg.vec)
+   }
+    
+    df.count[i,j] <- sum(df.temp[,day.vec[j]])/sum(df.merged[,day.vec[j]])
+    # df.count[i,j] <- sum(df.temp[,day.vec[j]])
+    
+  }
+}
+
+
 ```
 

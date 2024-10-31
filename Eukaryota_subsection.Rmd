@@ -14,7 +14,7 @@ After the meta data is loaded, the subsectioned dataset is loaded and the tempor
 ```{r setup, include=T}
 knitr::opts_chunk$set(echo = FALSE)
 
-#rm(list = ls())
+rm(list = ls())
 
 package.list <- c("dplyr","tidyverse","ggplot2","lemon","vegan","Rmisc","lubridate")
 
@@ -48,7 +48,7 @@ meta.data <- separate(meta.data, col = AssemblyGroup, into = c("Day.num","ToD"),
 # meta.data$lubri <- with_tz(mdy_hms(meta.data$datetime, tz = "UTC"),
 #                            tz = "America/Santiago")
 
-COG_categories <- read.csv("COG_categories.csv",sep = ",")
+COG_categories <- read.csv("COG_categories.csv",sep = ";")
 
 Eukaryota.merged <- read.csv("CSV_files/Eukaryota.merged.csv")
 
@@ -1367,6 +1367,7 @@ file_name_vec <- paste("COG_Class_plots/","COG_plot2.png",sep = "")
 
 ggsave(file_name_vec,width = 8,height = 8,dpi = 300)
 ```
+
 
 ```{r}
 df.merged <- Eukaryota.merged
