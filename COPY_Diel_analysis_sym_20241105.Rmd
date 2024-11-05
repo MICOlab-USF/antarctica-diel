@@ -247,15 +247,120 @@ KEGG_columns <- paste("KEGG",1:n_KEGG,sep = "")
 
 Bact.Sub <- separate(Bact.Sub,col = KEGG_ko,into = KEGG_columns,
                       sep = ",", remove = FALSE, fill = "right", extra = "drop")
+
+for(i in 1:length(KEGG_columns)){
+  if(i == 1){
+    vec_kegg <- unique(Bact.Sub[,KEGG_columns[i]])
+  }else{
+    vec <- Bact.Sub[,KEGG_columns[i]]
+    
+    NA_filter <- is.na(vec)
+    
+    if(any(NA_filter)){
+      vec <- vec[!NA_filter]
+    }
+    
+    vec_kegg <- unique(c(vec_kegg,unique(vec)))
+  }
+}
+
+# Kegg pathway API####
+# kegg_API <- function(kegg){
+#   pathway <- system(paste0("curl https://rest.kegg.jp/link/pathway/", kegg), intern=TRUE)
+#   l <- length(pathway)
+# 
+#   ifelse(l != 0,
+#          stri_sub(pathway[[l]], 16),
+#          "NA")
+# }
+# 
+# Ks <- unique(Bact.Sub$KEGG1[Bact.Sub$KEGG1 != "-"])[-3]
+# 
+# Ks <- vec_kegg[!(vec_kegg %in% KO_paths$K1)]
+# 
+# koslist <- Ks[Ks != "-"]
+# 
+# paths <- unlist(lapply(koslist,kegg_API))
+# KO_paths2 <- data.frame(koslist, paths)
+# names(KO_paths2) <- c("K1", "ko")
+
+# for(i in 1:nrow(Bact.Sub)){
+#   if(i == 1){
+#     Ko_path <- rep(NA,nrow(Bact.Sub))
+#   }
+# 
+#   vec <- Bact.Sub$KEGG1[i]
+#   if(vec %in% KO_paths$K1){
+#    vec_paths <- KO_paths$ko[KO_paths$K1 == vec]
+# 
+#    if(vec_paths == ""){
+#      Ko_path[i] <- "Unclassified"
+#    } else{
+#     Ko_path[i] <- vec_paths
+#    }
+#   } else {
+#     Ko_path[i] <- "Unclassified"
+#   }
+# }
+#####
+
+# Kegg Path lookup####
+
+Prok_KO_paths <- read.csv("KO_pathway.csv")
+
+for(i in 1:nrow(Bact.Sub)){
+  if(i == 1){
+    Ko_path <- rep(NA,nrow(Bact.Sub))
+  }
+
+  vec <- Bact.Sub$KEGG1[i]
+
+  vec_paths <- Prok_KO_paths$ko[Prok_KO_paths$K1 == vec]
+
+  if(vec == "-"){
+    vec_paths <- ""
+  }
+
+  if(vec_paths == ""){
+    for(j in 2:length(KEGG_columns)){
+      if(j == 2){
+        stop_vec <- TRUE
+      }
+
+      if(stop_vec){
+        vec <- Bact.Sub[i,KEGG_columns[j]]
+
+        if(is.na(vec)){
+          stop_vec <- FALSE
+          vec_paths <- ""
+        } else {
+          vec_paths <- Prok_KO_paths$ko[Prok_KO_paths$K1 == vec]
+        }
+
+        if(vec_paths != ""){
+          stop_vec <- FALSE
+        }
+      }
+    }
+
+
+  }
+  if(vec_paths == ""){
+    vec_paths <- "Unclassified"
+  }
+
+  Ko_path[i] <- vec_paths
+}
+
+Bact.Sub$K1_path <- Ko_path
 ```
 
 
 ```{r}
 df.merged <- Bact.Sub
 
-df.merged$KEGG1[df.merged$KEGG1 == "-"] <- "Unclassified"
-kegg.vec <- unique(df.merged$KEGG1)
-
+df.merged$K1_path <- Ko_path
+kegg.vec <- unique(df.merged$K1_path)
 n <- length(kegg.vec)
 
 # df.merged <- df.merged[df.merged$K1_path != "Unclassified",]
@@ -265,7 +370,7 @@ m <- length(day.vec)
 
 for(i in 1:n){ #Looping through the Classes to count the occurrences.
   
-  kegg.filter <- df.merged$KEGG1 == kegg.vec[i]
+  kegg.filter <- df.merged$K1_path == kegg.vec[i]
   df.temp <- df.merged[kegg.filter,]
   
   for(j in 1:m){ #Looping through the sampling time points.
@@ -284,9 +389,11 @@ for(i in 1:n){ #Looping through the Classes to count the occurrences.
   }
 }
 
-df.count2 <- df.count[df.count$kegg.vec != "Unclassified",]
+df.merged2 <- df.merged[df.merged$K1_path != "Unclassified",]
 
-top5.vec <- df.count2$kegg.vec[order(apply(df.count2[,-ncol(df.count2)],1,sum),decreasing = TRUE)[1:15]]
+# df.merged2 <- df.merged
+
+top5.vec <- names(table(df.merged2$K1_path)[order(-table(df.merged2$K1_path))[1:10]])
 
 top5.filter <- df.count$kegg.vec %in% c(top5.vec,"Unclassified")
 # top5.filter <- df.count$kegg.vec %in% c(top5.vec)
@@ -322,45 +429,52 @@ Day.Time <- meta.data[,c("AssemblyGroup","datetime")] %>%
 names(Day.Time)[names(Day.Time) == "AssemblyGroup"] <- "Day"
 
 dfOut2 <- merge(df.summ,Day.Time,by = "Day")
-# dfOut2_O.U <- dfOut2[(dfOut2$kegg.vec %in% c("Other","Unclassified")),]
-# 
-# dfOut2 <- dfOut2[!(dfOut2$kegg.vec %in% c("Other","Unclassified")),]
+dfOut2_O.U <- dfOut2[(dfOut2$kegg.vec %in% c("Other","Unclassified")),]
+
+dfOut2 <- dfOut2[!(dfOut2$kegg.vec %in% c("Other","Unclassified")),]
 
 partime$norm.par <- partime$par / max(partime$par)
 
-# Pathway names API-------------------------------------------------------------
+# Pathway names API ####
 
 Pathway_activate <- TRUE
 
 if(Pathway_activate){
-  source("pathway_API.R")
-  
   top_kos <- top5.vec
   
   name <- character(length=0)
   class <- character(length=0)
-  rel_paths <- character(length=0)
   
   for(i in 1:length(top_kos)) {
-    
-    pathway <- pathway_API(top_kos[i])
-    name[i] <- pathway$name
-    class[i] <- pathway$class
-    rel_paths[i] <- pathway$Rel_paths[1]
+    pathway <- system(paste0("curl https://rest.kegg.jp/get/", top_kos[[i]]), intern=TRUE)
+    name[[i]] <- pathway[[4]]
+    class[[i]] <-pathway[[5]]
   }
   
-  topkos_w_info <-data.frame(top_kos, name, class, rel_paths)
+  topkos_w_info <-data.frame(top_kos, name, class)
+  
+  source("split_function.R")
+  
+  unlist(split_function(topkos_w_info$name[1],"        "))[2]
+  
+  for(i in 1:nrow(topkos_w_info)){
+    if(i == 1){
+     path_names <- rep(NA,nrow(topkos_w_info)) 
+    }
+    
+    path_names[i] <- unlist(split_function(topkos_w_info$name[i],"        "))[2]
+    
+    if(i == nrow(topkos_w_info)){
+      topkos_w_info$name <- path_names
+    }
+  }
   
   for(i in 1:nrow(dfOut2)){
     if(i == 1){
       path_names <- rep(NA,nrow(dfOut2))
     }
     
-    if(dfOut2$kegg.vec[i] %in% c("Unclassified","Other")){
-      path_names[i] <- dfOut2$kegg.vec[i]
-    }else{
-      path_names[i] <- topkos_w_info$name[topkos_w_info$top_kos == dfOut2$kegg.vec[i]]
-    }
+    path_names[i] <- topkos_w_info$name[topkos_w_info$top_kos == dfOut2$kegg.vec[i]]
   }
   
   for(i in 1:length(top5.vec)){
@@ -373,9 +487,7 @@ if(Pathway_activate){
   dfOut2$kegg.vec <- path_names
 }
 
-# Create Plot ------------------------------------------------------------------
-
-dfOut2 <- dfOut2[!(dfOut2$kegg.vec %in% c("Unclassified","Other")),]
+# Create Plot ####
 
 p1 <- ggplot(dfOut2)+
   geom_bar(aes(fill = factor(kegg.vec,
@@ -385,7 +497,8 @@ p1 <- ggplot(dfOut2)+
            position = "stack", stat = "identity")+
   scale_x_continuous(breaks = unique(meta.data$datetime),
                      labels = unique(meta.data$AssemblyGroup))+
-  scale_fill_manual(values = c(brewer.pal(12,"Set3"),brewer.pal(8,"Set2"),brewer.pal(9,"Set1")))+
+  scale_color_manual(values = c("Other" = "black",
+                              "Unclassified" = "grey"))+
   labs(title = "All Bacteria",
        y = "Fraction of TPM",
        x = "Time of sample",
@@ -395,7 +508,12 @@ p1 <- ggplot(dfOut2)+
                                    vjust = 0.5,
                                    hjust=1))+
   guides(fill = guide_legend(title = "kegg"),
-         alpha = "none")
+         alpha = "none")+
+  geom_point(data = dfOut2_O.U,
+             aes(y = Count,
+                 x = datetime,
+                 color = kegg.vec,
+                 shape = kegg.vec))
 
 # scale <- max(partime$par)
 # 
@@ -419,9 +537,7 @@ Genus_of_interest <- c("Paraglaciecola","Colwellia")
 
 df.merged <- Bact.Sub
 
-df.merged$KEGG1[df.merged$KEGG1 == "-"] <- "Unclassified"
-kegg.vec <- unique(df.merged$KEGG1)
-
+kegg.vec <- unique(df.merged$K1_path)
 n <- length(kegg.vec)
 
 #Counting TPM for keggs for each order of interest####
@@ -439,7 +555,7 @@ for(order_idx in Order_of_interest){
   
   for(i in 1:n){ #Looping through the Classes to count the occurrences.
     
-    kegg.filter <- df.merged$KEGG1 == kegg.vec[i]
+    kegg.filter <- df.merged$K1_path == kegg.vec[i]
     df.temp <- df.merged[kegg.filter,]
     
     for(j in 1:m){ #Looping through the sampling time points.
@@ -458,9 +574,11 @@ for(order_idx in Order_of_interest){
     }
   }
   
-  df.count2 <- df.count[df.count$kegg.vec != "Unclassified",]
-
-  top5.vec <- df.count2$kegg.vec[order(apply(df.count2[,-ncol(df.count2)],1,sum),decreasing = TRUE)[1:5]]
+  df.merged2 <- df.merged[df.merged$K1_path != "Unclassified",]
+  
+  # df.merged2 <- df.merged
+  
+  top5.vec <- names(table(df.merged2$K1_path)[order(-table(df.merged2$K1_path))[1:5]])
   
   top5.filter <- df.count$kegg.vec %in% c(top5.vec,"Unclassified")
   # top5.filter <- df.count$kegg.vec %in% c(top5.vec)
@@ -500,50 +618,61 @@ for(order_idx in Order_of_interest){
   
   name_vec <- paste("dfOut2_",order_idx,sep = "")
   assign(name_vec,dfOut2,envir = globalenv())
-  
-  if(order_idx == Order_of_interest[1]){
-    dfOut3 <- dfOut2
-  }else{
-    dfOut3 <- rbind.data.frame(dfOut3,dfOut2)
-  }
 }
 #####
 
+
+
+dfOut3 <- rbind.data.frame(dfOut2_Alteromonadales,
+                           dfOut2_Cellvibrionales,
+                           dfOut2_Oceanospirillales,
+                           dfOut2_Sphingomonadales)
+
 level_vec <- unique(dfOut3$kegg.vec)[!(unique(dfOut3$kegg.vec) %in% c("Unclassified","Other"))]
 
-# Pathway names API-------------------------------------------------------------
+dfOut_O.U <- dfOut3[(dfOut3$kegg.vec %in% c("Unclassified","Other")),]
+dfOut3 <- dfOut3[!(dfOut3$kegg.vec %in% c("Unclassified","Other")),]
+
+# Pathway names API ####
 
 Pathway_activate <- TRUE
 
 if(Pathway_activate){
-  source("pathway_API.R")
-  
   top_kos <- level_vec
   
   name <- character(length=0)
   class <- character(length=0)
-  rel_paths <- character(length=0)
   
   for(i in 1:length(top_kos)) {
-    
-    pathway <- pathway_API(top_kos[i])
-    name[i] <- pathway$name
-    class[i] <- pathway$class
-    rel_paths[i] <- pathway$Rel_paths[1]
+    pathway <- system(paste0("curl https://rest.kegg.jp/get/", top_kos[[i]]), intern=TRUE)
+    name[[i]] <- pathway[[4]]
+    class[[i]] <-pathway[[5]]
   }
   
-  topkos_w_info <-data.frame(top_kos, name, class, rel_paths)
+  topkos_w_info <-data.frame(top_kos, name, class)
+  
+  source("split_function.R")
+  
+  unlist(split_function(topkos_w_info$name[1],"        "))[2]
+  
+  for(i in 1:nrow(topkos_w_info)){
+    if(i == 1){
+     path_names <- rep(NA,nrow(topkos_w_info)) 
+    }
+    
+    path_names[i] <- unlist(split_function(topkos_w_info$name[i],"        "))[2]
+    
+    if(i == nrow(topkos_w_info)){
+      topkos_w_info$name <- path_names
+    }
+  }
   
   for(i in 1:nrow(dfOut3)){
     if(i == 1){
       path_names <- rep(NA,nrow(dfOut3))
     }
     
-    if(dfOut3$kegg.vec[i] %in% c("Unclassified","Other")){
-      path_names[i] <- dfOut3$kegg.vec[i]
-    }else{
-      path_names[i] <- topkos_w_info$name[topkos_w_info$top_kos == dfOut3$kegg.vec[i]]
-    }
+    path_names[i] <- topkos_w_info$name[topkos_w_info$top_kos == dfOut3$kegg.vec[i]]
   }
   
   for(i in 1:length(level_vec)){
@@ -556,9 +685,7 @@ if(Pathway_activate){
   dfOut3$kegg.vec <- path_names
 }
 
-# Create Plot ------------------------------------------------------------------
-
-dfOut3 <- dfOut3[!(dfOut3$kegg.vec %in% c("Unclassified","Other")),]
+# Create Plot ####
 
 p3 <- ggplot(dfOut3)+
   geom_bar(aes(fill = factor(kegg.vec,
@@ -567,12 +694,14 @@ p3 <- ggplot(dfOut3)+
                y = Count,
                x = datetime),
            position = "stack", stat = "identity")+
+  geom_point(data = dfOut_O.U,
+             aes(x = datetime,
+                 y = Count,
+                 color = kegg.vec))+
   scale_x_continuous(breaks = unique(meta.data$datetime),
                      labels = unique(meta.data$AssemblyGroup))+
-  scale_fill_manual(values = c(brewer.pal(12,"Set3"),
-                               brewer.pal(8,"Set2"),
-                               brewer.pal(9,"Set1"),
-                               brewer.pal(9,"Pastel1")))+
+  scale_color_manual(values = c("Other" = "black",
+                              "Unclassified" = "grey"))+
   facet_wrap(facets = "Facet_name",
              nrow = 2,
              ncol = 2,
@@ -591,474 +720,208 @@ p3 <- ggplot(dfOut3)+
 p3
 
 save_name <- "KO_plots/FourBact_topKO.png"
-ggsave(save_name,width = 10,height = 6,dpi = 300)
+# ggsave(save_name,width = 10,height = 5,dpi = 300)
 ```
 
 ```{r}
-Order_of_interest <- c("Alteromonadales","Oceanospirillales","Sphingomonadales","Cellvibrionales")
-Genus_of_interest <- c("Paraglaciecola","Colwellia")
+ThisName <- Order_of_interest[3]
 
-df.merged <- Bact.Sub
+filter <- df.merged_NoNA$Order == ThisName
+  
+df.merged <- df.merged_NoNA[filter,]
 
-# assigning pathways------------------------------------------------------------
+filter <- df.merged$K1_path == "ko01100"
 
-Prok_KO_paths <- read.csv("KO_pathway.csv")
+df.merged <- df.merged[filter,]
 
-for(i in 1:nrow(Bact.Sub)){
-  if(i == 1){
-    Ko_path <- rep(NA,nrow(Bact.Sub))
+kegg.vec <- unique(df.merged$KEGG1)
+n <- length(kegg.vec)
+
+day.vec <- paste(meta.data$SampleID,"_quant",sep = "")
+m <- length(day.vec)
+
+for(i in 1:n){ #Looping through the Classes to count the occurrences.
+    
+  kegg.filter <- df.merged$KEGG1 == kegg.vec[i]
+  df.temp <- df.merged[kegg.filter,]
+  
+  for(j in 1:m){ #Looping through the sampling time points.
+    
+   if(i == 1 & j == 1){ #Sets up an empty data.frame to input the data
+     
+     df.count <- data.frame(matrix(ncol = m, nrow = n))
+     names(df.count) <- meta.data$SampleName
+     
+     df.count <- cbind(df.count,kegg.vec)
+   }
+    
+    df.count[i,j] <- sum(df.temp[,day.vec[j]])/sum(df.merged[,day.vec[j]])
+    # df.count[i,j] <- sum(df.temp[,day.vec[j]])
+    
   }
-
-  vec <- Bact.Sub$KEGG1[i]
-
-  vec_paths <- Prok_KO_paths$ko[Prok_KO_paths$K1 == vec]
-
-  if(vec == "-"){
-    vec_paths <- ""
-  }
-
-  if(vec_paths == ""){
-    for(j in 2:length(KEGG_columns)){
-      if(j == 2){
-        stop_vec <- TRUE
-      }
-
-      if(stop_vec){
-        vec <- Bact.Sub[i,KEGG_columns[j]]
-
-        if(is.na(vec)){
-          stop_vec <- FALSE
-          vec_paths <- ""
-        } else {
-          vec_paths <- Prok_KO_paths$ko[Prok_KO_paths$K1 == vec]
-        }
-
-        if(vec_paths != ""){
-          stop_vec <- FALSE
-        }
-      }
-    }
-
-
-  }
-  if(vec_paths == ""){
-    vec_paths <- "Unclassified"
-  }
-
-  Ko_path[i] <- vec_paths
 }
 
-Bact.Sub$K1_path <- Ko_path
+top5.vec <- df.count$kegg.vec[order(apply(df.count[,-ncol(df.count)],1,sum),decreasing = TRUE)[1:12]]
 
-# Counting TPM -----------------------------------------------------------------
+top5.filter <- df.count$kegg.vec %in% c(top5.vec)
+  # top5.filter <- df.count$kegg.vec %in% c(top5.vec)
+  
+  df.top5 <- df.count[top5.filter,]
+  df.other <- df.count[!top5.filter,]
+  
+  df.count2 <- rbind(df.top5,c(colSums(df.other[,1:24]),"Other"))
+  
+order.vec <- c("Day1_afternoon",
+               "Day1_evening",
+               "Day1_night",
+               "Day1_morning",
+               "Day2_night",
+               "Day2_morning",
+               "Day2_afternoon",
+               "Day2_evening")
 
-df.merged$KEGG1[df.merged$KEGG1 == "-"] <- "Unclassified"
+dfOut <- pivot_longer(df.count2,
+                      all_of(meta.data$SampleName),
+                      names_to = "Day",
+                      values_to = "Count") %>% 
+  mutate(Count = as.numeric(Count))
 
-#Counting TPM for keggs for each order of interest####
-df.merged_copy <- df.merged
-df.merged_NoNA <- df.merged_copy[!is.na(df.merged_copy$Order),]
+dfOut$Day <- substring(dfOut$Day,1,nchar(dfOut$Day)-1)
 
-for(order_idx in Order_of_interest){
-  
-    order_filter <- df.merged_NoNA$Order == order_idx
-    
-    df.merged <- df.merged_NoNA[order_filter,]
-    
-    filter <- df.merged$K1_path == "ko01100"
+df.summ <- summarySE(data = dfOut, "Count",
+                     groupvars = c("Day","kegg.vec"))
 
-    df.merged <- df.merged[filter,]
-    
-    kegg.vec <- unique(df.merged$KEGG1)
-    n <- length(kegg.vec)
-    
-    day.vec <- paste(meta.data$SampleID,"_quant",sep = "")
-    m <- length(day.vec)
-  
-  for(i in 1:n){ #Looping through the Classes to count the occurrences.
-      
-    kegg.filter <- df.merged$KEGG1 == kegg.vec[i]
-    df.temp <- df.merged[kegg.filter,]
-    
-    for(j in 1:m){ #Looping through the sampling time points.
-      
-     if(i == 1 & j == 1){ #Sets up an empty data.frame to input the data
-       
-       df.count <- data.frame(matrix(ncol = m, nrow = n))
-       names(df.count) <- meta.data$SampleName
-       
-       df.count <- cbind(df.count,kegg.vec)
-     }
-      
-      df.count[i,j] <- sum(df.temp[,day.vec[j]])/sum(df.merged[,day.vec[j]])
-      # df.count[i,j] <- sum(df.temp[,day.vec[j]])
-      
-    }
-  }
-  
-  top5.vec <- df.count$kegg.vec[order(apply(df.count[,-ncol(df.count)],1,sum),decreasing = TRUE)[1:7]]
-  
-  top5.filter <- df.count$kegg.vec %in% c(top5.vec)
-    # top5.filter <- df.count$kegg.vec %in% c(top5.vec)
-    
-    df.top5 <- df.count[top5.filter,]
-    df.other <- df.count[!top5.filter,]
-    
-    df.count2 <- rbind(df.top5,c(colSums(df.other[,1:24]),"Other"))
-    
-  order.vec <- c("Day1_afternoon",
-                 "Day1_evening",
-                 "Day1_night",
-                 "Day1_morning",
-                 "Day2_night",
-                 "Day2_morning",
-                 "Day2_afternoon",
-                 "Day2_evening")
-  
-  dfOut <- pivot_longer(df.count2,
-                        all_of(meta.data$SampleName),
-                        names_to = "Day",
-                        values_to = "Count") %>% 
-    mutate(Count = as.numeric(Count))
-  
-  dfOut$Day <- substring(dfOut$Day,1,nchar(dfOut$Day)-1)
-  
-  df.summ <- summarySE(data = dfOut, "Count",
-                       groupvars = c("Day","kegg.vec"))
-  
-  Day.Time <- meta.data[,c("AssemblyGroup","datetime")] %>% 
-    distinct(AssemblyGroup, .keep_all = TRUE)
-  
-  names(Day.Time)[names(Day.Time) == "AssemblyGroup"] <- "Day"
-  
-  dfOut2 <- merge(df.summ,Day.Time,by = "Day") %>% 
-    mutate(Facet_name = order_idx)
-  
-  name_vec <- paste("dfOut2_",order_idx,sep = "")
-  assign(name_vec,dfOut2,envir = globalenv())
-  
-  if(order_idx == Order_of_interest[1]){
-    dfOut3 <- dfOut2
-  }else{
-    dfOut3 <- rbind.data.frame(dfOut3,dfOut2)
-  }
+Day.Time <- meta.data[,c("AssemblyGroup","datetime")] %>% 
+  distinct(AssemblyGroup, .keep_all = TRUE)
 
-}
+names(Day.Time)[names(Day.Time) == "AssemblyGroup"] <- "Day"
 
-level_vec <- unique(dfOut3$kegg.vec)[!(unique(dfOut3$kegg.vec) %in% c("Unclassified","Other"))]
+dfOut2 <- merge(df.summ,Day.Time,by = "Day")
 
-# Pathway names API-------------------------------------------------------------
-
-Pathway_activate <- TRUE
-
-if(Pathway_activate){
-  source("pathway_API.R")
-  
-  top_kos <- level_vec
-  
-  name <- character(length=0)
-  class <- character(length=0)
-  rel_paths <- character(length=0)
-  
-  for(i in 1:length(top_kos)) {
-    
-    pathway <- pathway_API(top_kos[i])
-    name[i] <- pathway$name
-    class[i] <- pathway$class
-    rel_paths[i] <- pathway$Rel_paths[1]
-  }
-  
-  topkos_w_info <-data.frame(top_kos, name, class, rel_paths)
-  
-  for(i in 1:nrow(dfOut3)){
-    if(i == 1){
-      path_names <- rep(NA,nrow(dfOut3))
-    }
-    
-    if(dfOut3$kegg.vec[i] %in% c("Unclassified","Other")){
-      path_names[i] <- dfOut3$kegg.vec[i]
-    }else{
-      path_names[i] <- topkos_w_info$name[topkos_w_info$top_kos == dfOut3$kegg.vec[i]]
-    }
-  }
-  
-  for(i in 1:length(level_vec)){
-    
-    vec <- topkos_w_info$name[topkos_w_info$top_kos == level_vec[i]]
-    
-    level_vec[i] <- vec
-  }
-  
-  dfOut3$kegg.vec <- path_names
-}
-
-# Create Plot ------------------------------------------------------------------
-
-p4 <- ggplot(dfOut3)+
+p4 <- ggplot(dfOut2)+
   geom_bar(aes(fill = factor(kegg.vec,
-                             levels = c("Unclassified","Other",level_vec)
-                             ),
+                             levels = c("Other",top5.vec)),
                y = Count,
                x = datetime),
            position = "stack", stat = "identity")+
   scale_x_continuous(breaks = unique(meta.data$datetime),
                      labels = unique(meta.data$AssemblyGroup))+
-  scale_fill_manual(values = c(brewer.pal(12,"Set3"),
-                               brewer.pal(8,"Set2"),
-                               brewer.pal(9,"Set1"),
-                               brewer.pal(12,"Paired")))+
-  facet_wrap(facets = "Facet_name",
-             nrow = 2,
-             ncol = 2,
-             scales = "free_y")+
-  labs(title = "Metabolic Pathway",
+  labs(title = paste(ThisName,"Metabolic Pathway"),
        y = "Fraction of TPM",
        x = "Time of sample")+
   theme_classic()+
   theme(axis.text.x = element_text(angle = 90,
                                    vjust = 0.5,
                                    hjust=1))+
-  guides(fill = guide_legend(title = "kegg"),
+  guides(fill = guide_legend(title = "Pathway"),
          alpha = "none",
          color = guide_legend(title = "Shape"))
 
 p4
 
-save_name <- paste("KO_plots/FourBact_MetabolicPathway.png",sep = "")
-ggsave(save_name,width = 10,height = 6,dpi = 300)
+save_name <- paste("KO_plots/",ThisName,"_MetabolicPathway.png",sep = "")
+ggsave(save_name,width = 10,height = 5,dpi = 300)
 ```
 
 
 
 ```{r}
-Order_of_interest <- c("Alteromonadales","Oceanospirillales","Sphingomonadales","Cellvibrionales")
-Genus_of_interest <- c("Paraglaciecola","Colwellia")
+ThisName <- Order_of_interest[4]
 
-df.merged <- Bact.Sub
+filter <- df.merged_NoNA$Order == ThisName
+  
+df.merged <- df.merged_NoNA[filter,]
 
-# assigning pathways------------------------------------------------------------
+filter <- df.merged$K1_path == "ko03010"
 
-Prok_KO_paths <- read.csv("KO_pathway.csv")
+df.merged <- df.merged[filter,]
 
-for(i in 1:nrow(Bact.Sub)){
-  if(i == 1){
-    Ko_path <- rep(NA,nrow(Bact.Sub))
+kegg.vec <- unique(df.merged$KEGG1)
+n <- length(kegg.vec)
+
+day.vec <- paste(meta.data$SampleID,"_quant",sep = "")
+m <- length(day.vec)
+
+for(i in 1:n){ #Looping through the Classes to count the occurrences.
+    
+  kegg.filter <- df.merged$KEGG1 == kegg.vec[i]
+  df.temp <- df.merged[kegg.filter,]
+  
+  for(j in 1:m){ #Looping through the sampling time points.
+    
+   if(i == 1 & j == 1){ #Sets up an empty data.frame to input the data
+     
+     df.count <- data.frame(matrix(ncol = m, nrow = n))
+     names(df.count) <- meta.data$SampleName
+     
+     df.count <- cbind(df.count,kegg.vec)
+   }
+    
+    df.count[i,j] <- sum(df.temp[,day.vec[j]])/sum(df.merged[,day.vec[j]])
+    # df.count[i,j] <- sum(df.temp[,day.vec[j]])
+    
   }
-
-  vec <- Bact.Sub$KEGG1[i]
-
-  vec_paths <- Prok_KO_paths$ko[Prok_KO_paths$K1 == vec]
-
-  if(vec == "-"){
-    vec_paths <- ""
-  }
-
-  if(vec_paths == ""){
-    for(j in 2:length(KEGG_columns)){
-      if(j == 2){
-        stop_vec <- TRUE
-      }
-
-      if(stop_vec){
-        vec <- Bact.Sub[i,KEGG_columns[j]]
-
-        if(is.na(vec)){
-          stop_vec <- FALSE
-          vec_paths <- ""
-        } else {
-          vec_paths <- Prok_KO_paths$ko[Prok_KO_paths$K1 == vec]
-        }
-
-        if(vec_paths != ""){
-          stop_vec <- FALSE
-        }
-      }
-    }
-
-
-  }
-  if(vec_paths == ""){
-    vec_paths <- "Unclassified"
-  }
-
-  Ko_path[i] <- vec_paths
 }
 
-Bact.Sub$K1_path <- Ko_path
+top5.vec <- df.count$kegg.vec[order(apply(df.count[,-ncol(df.count)],1,sum),decreasing = TRUE)[1:10]]
 
-# Counting TPM -----------------------------------------------------------------
+top5.filter <- df.count$kegg.vec %in% c(top5.vec)
+  # top5.filter <- df.count$kegg.vec %in% c(top5.vec)
+  
+  df.top5 <- df.count[top5.filter,]
+  df.other <- df.count[!top5.filter,]
+  
+  df.count2 <- rbind(df.top5,c(colSums(df.other[,1:24]),"Other"))
 
-df.merged$KEGG1[df.merged$KEGG1 == "-"] <- "Unclassified"
+order.vec <- c("Day1_afternoon",
+               "Day1_evening",
+               "Day1_night",
+               "Day1_morning",
+               "Day2_night",
+               "Day2_morning",
+               "Day2_afternoon",
+               "Day2_evening")
 
-#Counting TPM for keggs for each order of interest####
-df.merged_copy <- df.merged
-df.merged_NoNA <- df.merged_copy[!is.na(df.merged_copy$Order),]
+dfOut <- pivot_longer(df.count2,
+                      all_of(meta.data$SampleName),
+                      names_to = "Day",
+                      values_to = "Count") %>% 
+  mutate(Count = as.numeric(Count))
 
-for(order_idx in Order_of_interest){
-  
-    order_filter <- df.merged_NoNA$Order == order_idx
-    
-    df.merged <- df.merged_NoNA[order_filter,]
-    
-    filter <- df.merged$K1_path == "ko03010"
+dfOut$Day <- substring(dfOut$Day,1,nchar(dfOut$Day)-1)
 
-    df.merged <- df.merged[filter,]
-    
-    kegg.vec <- unique(df.merged$KEGG1)
-    n <- length(kegg.vec)
-    
-    day.vec <- paste(meta.data$SampleID,"_quant",sep = "")
-    m <- length(day.vec)
-  
-  for(i in 1:n){ #Looping through the Classes to count the occurrences.
-      
-    kegg.filter <- df.merged$KEGG1 == kegg.vec[i]
-    df.temp <- df.merged[kegg.filter,]
-    
-    for(j in 1:m){ #Looping through the sampling time points.
-      
-     if(i == 1 & j == 1){ #Sets up an empty data.frame to input the data
-       
-       df.count <- data.frame(matrix(ncol = m, nrow = n))
-       names(df.count) <- meta.data$SampleName
-       
-       df.count <- cbind(df.count,kegg.vec)
-     }
-      
-      df.count[i,j] <- sum(df.temp[,day.vec[j]])/sum(df.merged[,day.vec[j]])
-      # df.count[i,j] <- sum(df.temp[,day.vec[j]])
-      
-    }
-  }
-  
-  top5.vec <- df.count$kegg.vec[order(apply(df.count[,-ncol(df.count)],1,sum),decreasing = TRUE)[1:5]]
-  
-  top5.filter <- df.count$kegg.vec %in% c(top5.vec)
-    # top5.filter <- df.count$kegg.vec %in% c(top5.vec)
-    
-    df.top5 <- df.count[top5.filter,]
-    df.other <- df.count[!top5.filter,]
-    
-    df.count2 <- rbind(df.top5,c(colSums(df.other[,1:24]),"Other"))
-    
-  order.vec <- c("Day1_afternoon",
-                 "Day1_evening",
-                 "Day1_night",
-                 "Day1_morning",
-                 "Day2_night",
-                 "Day2_morning",
-                 "Day2_afternoon",
-                 "Day2_evening")
-  
-  dfOut <- pivot_longer(df.count2,
-                        all_of(meta.data$SampleName),
-                        names_to = "Day",
-                        values_to = "Count") %>% 
-    mutate(Count = as.numeric(Count))
-  
-  dfOut$Day <- substring(dfOut$Day,1,nchar(dfOut$Day)-1)
-  
-  df.summ <- summarySE(data = dfOut, "Count",
-                       groupvars = c("Day","kegg.vec"))
-  
-  Day.Time <- meta.data[,c("AssemblyGroup","datetime")] %>% 
-    distinct(AssemblyGroup, .keep_all = TRUE)
-  
-  names(Day.Time)[names(Day.Time) == "AssemblyGroup"] <- "Day"
-  
-  dfOut2 <- merge(df.summ,Day.Time,by = "Day") %>% 
-    mutate(Facet_name = order_idx)
-  
-  name_vec <- paste("dfOut2_",order_idx,sep = "")
-  assign(name_vec,dfOut2,envir = globalenv())
-  
-  if(order_idx == Order_of_interest[1]){
-    dfOut3 <- dfOut2
-  }else{
-    dfOut3 <- rbind.data.frame(dfOut3,dfOut2)
-  }
+df.summ <- summarySE(data = dfOut, "Count",
+                     groupvars = c("Day","kegg.vec"))
 
-}
+Day.Time <- meta.data[,c("AssemblyGroup","datetime")] %>% 
+  distinct(AssemblyGroup, .keep_all = TRUE)
 
-level_vec <- unique(dfOut3$kegg.vec)[!(unique(dfOut3$kegg.vec) %in% c("Unclassified","Other"))]
+names(Day.Time)[names(Day.Time) == "AssemblyGroup"] <- "Day"
 
-# Pathway names API-------------------------------------------------------------
+dfOut2 <- merge(df.summ,Day.Time,by = "Day")
 
-Pathway_activate <- TRUE
-
-if(Pathway_activate){
-  source("pathway_API.R")
-  
-  top_kos <- level_vec
-  
-  name <- character(length=0)
-  class <- character(length=0)
-  rel_paths <- character(length=0)
-  
-  for(i in 1:length(top_kos)) {
-    
-    pathway <- pathway_API(top_kos[i])
-    name[i] <- pathway$name
-    class[i] <- pathway$class
-    rel_paths[i] <- pathway$Rel_paths[1]
-  }
-  
-  topkos_w_info <-data.frame(top_kos, name, class, rel_paths)
-  
-  for(i in 1:nrow(dfOut3)){
-    if(i == 1){
-      path_names <- rep(NA,nrow(dfOut3))
-    }
-    
-    if(dfOut3$kegg.vec[i] %in% c("Unclassified","Other")){
-      path_names[i] <- dfOut3$kegg.vec[i]
-    }else{
-      path_names[i] <- topkos_w_info$name[topkos_w_info$top_kos == dfOut3$kegg.vec[i]]
-    }
-  }
-  
-  for(i in 1:length(level_vec)){
-    
-    vec <- topkos_w_info$name[topkos_w_info$top_kos == level_vec[i]]
-    
-    level_vec[i] <- vec
-  }
-  
-  dfOut3$kegg.vec <- path_names
-}
-
-# Create Plot ------------------------------------------------------------------
-
-p4 <- ggplot(dfOut3)+
+p5 <- ggplot(dfOut2)+
   geom_bar(aes(fill = factor(kegg.vec,
-                             levels = c("Unclassified","Other",level_vec)
-                             ),
+                             levels = c("Other",top5.vec)),
                y = Count,
                x = datetime),
            position = "stack", stat = "identity")+
   scale_x_continuous(breaks = unique(meta.data$datetime),
                      labels = unique(meta.data$AssemblyGroup))+
-  scale_fill_manual(values = c(brewer.pal(12,"Set3"),
-                               brewer.pal(8,"Set2"),
-                               brewer.pal(9,"Set1"),
-                               brewer.pal(12,"Paired")))+
-  facet_wrap(facets = "Facet_name",
-             nrow = 2,
-             ncol = 2,
-             scales = "free_y")+
-  labs(title = "Ribosome",
+  labs(title = paste(ThisName,"Ribosome"),
        y = "Fraction of TPM",
        x = "Time of sample")+
   theme_classic()+
   theme(axis.text.x = element_text(angle = 90,
                                    vjust = 0.5,
                                    hjust=1))+
-  guides(fill = guide_legend(title = "kegg"),
+  guides(fill = guide_legend(title = "Pathway"),
          alpha = "none",
          color = guide_legend(title = "Shape"))
 
-p4
+p5
 
-save_name <- paste("KO_plots/FourBact_Ribosome.png",sep = "")
+save_name <- paste("KO_plots/",ThisName,"_Ribosome.png",sep = "")
 ggsave(save_name,width = 10,height = 5,dpi = 300)
 ```
 
@@ -1084,21 +947,129 @@ KEGG_columns <- paste("KEGG",1:n_KEGG,sep = "")
 
 Euk.Sub <- separate(Euk.Sub,col = KEGG_ko,into = KEGG_columns,
                       sep = ",", remove = FALSE, fill = "right", extra = "drop")
+
+for(i in 1:length(KEGG_columns)){
+  if(i == 1){
+    vec_kegg <- unique(Euk.Sub[,KEGG_columns[i]])
+  }else{
+    vec <- Euk.Sub[,KEGG_columns[i]]
+    
+    NA_filter <- is.na(vec)
+    
+    if(any(NA_filter)){
+      vec <- vec[!NA_filter]
+    }
+    
+    vec_kegg <- unique(c(vec_kegg,unique(vec)))
+  }
+}
+
+# Kegg pathway API####
+# kegg_API <- function(kegg){
+#   pathway <- system(paste0("curl https://rest.kegg.jp/link/pathway/", kegg), intern=TRUE)
+#   l <- length(pathway)
+# 
+#   ifelse(l != 0,
+#          stri_sub(pathway[[l]], 16),
+#          "NA")
+# }
+# 
+# Ks <- unique(Euk.Sub$KEGG1[Euk.Sub$KEGG1 != "-"])[-3]
+# 
+# Ks <- vec_kegg[!(vec_kegg %in% KO_paths$K1)]
+# 
+# koslist <- Ks[Ks != "-"]
+# 
+# paths <- unlist(lapply(koslist,kegg_API))
+# KO_paths2 <- data.frame(koslist, paths)
+# names(KO_paths2) <- c("K1", "ko")
+
+# for(i in 1:nrow(Euk.Sub)){
+#   if(i == 1){
+#     Ko_path <- rep(NA,nrow(Euk.Sub))
+#   }
+# 
+#   vec <- Euk.Sub$KEGG1[i]
+#   if(vec %in% KO_paths$K1){
+#    vec_paths <- KO_paths$ko[KO_paths$K1 == vec]
+# 
+#    if(vec_paths == ""){
+#      Ko_path[i] <- "Unclassified"
+#    } else{
+#     Ko_path[i] <- vec_paths
+#    }
+#   } else {
+#     Ko_path[i] <- "Unclassified"
+#   }
+# }
+#####
+
+# Kegg Path lookup####
+
+Euk_KO_paths <- read.csv("KO_pathway_Euk.csv")
+
+for(i in 1:nrow(Euk.Sub)){
+  if(i == 1){
+    Ko_path <- rep(NA,nrow(Euk.Sub))
+  }
+
+  vec <- Euk.Sub$KEGG1[i]
+
+  vec_paths <- Euk_KO_paths$ko[Euk_KO_paths$K1 == vec]
+
+  if(vec == "-"){
+    vec_paths <- ""
+  }
+
+  if(vec_paths == ""){
+    for(j in 2:length(KEGG_columns)){
+      if(j == 2){
+        stop_vec <- TRUE
+      }
+
+      if(stop_vec){
+        vec <- Euk.Sub[i,KEGG_columns[j]]
+
+        if(is.na(vec)){
+          stop_vec <- FALSE
+          vec_paths <- ""
+        } else {
+          vec_paths <- Euk_KO_paths$ko[Euk_KO_paths$K1 == vec]
+        }
+
+        if(vec_paths != ""){
+          stop_vec <- FALSE
+        }
+      }
+    }
+
+
+  }
+  if(vec_paths == ""){
+    vec_paths <- "Unclassified"
+  }
+
+  Ko_path[i] <- vec_paths
+}
+
+Euk.Sub$K1_path <- Ko_path
 ```
 
 ```{r}
 df.merged <- Euk.Sub
 
-df.merged$KEGG1[df.merged$KEGG1 == "-"] <- "Unclassified"
-kegg.vec <- unique(df.merged$KEGG1)
+df.merged$K1_path <- Ko_path
+kegg.vec <- unique(df.merged$K1_path)
 n <- length(kegg.vec)
+
+# df.merged <- df.merged[df.merged$K1_path != "Unclassified",]
 
 day.vec <- paste(meta.data$SampleID,"_quant",sep = "")
 m <- length(day.vec)
 
 for(i in 1:n){ #Looping through the Classes to count the occurrences.
   
-  kegg.filter <- df.merged$KEGG1 == kegg.vec[i]
+  kegg.filter <- df.merged$K1_path == kegg.vec[i]
   df.temp <- df.merged[kegg.filter,]
   
   for(j in 1:m){ #Looping through the sampling time points.
@@ -1117,9 +1088,11 @@ for(i in 1:n){ #Looping through the Classes to count the occurrences.
   }
 }
 
-df.count2 <- df.count[df.count$kegg.vec != "Unclassified",]
+df.merged2 <- df.merged[df.merged$K1_path != "Unclassified",]
 
-top5.vec <- df.count2$kegg.vec[order(apply(df.count2[,-ncol(df.count2)],1,sum),decreasing = TRUE)[1:15]]
+# df.merged2 <- df.merged
+
+top5.vec <- names(table(df.merged2$K1_path)[order(-table(df.merged2$K1_path))[1:10]])
 
 top5.filter <- df.count$kegg.vec %in% c(top5.vec,"Unclassified")
 # top5.filter <- df.count$kegg.vec %in% c(top5.vec)
@@ -1155,42 +1128,52 @@ Day.Time <- meta.data[,c("AssemblyGroup","datetime")] %>%
 names(Day.Time)[names(Day.Time) == "AssemblyGroup"] <- "Day"
 
 dfOut2 <- merge(df.summ,Day.Time,by = "Day")
+dfOut2_O.U <- dfOut2[(dfOut2$kegg.vec %in% c("Other","Unclassified")),]
+
+dfOut2 <- dfOut2[!(dfOut2$kegg.vec %in% c("Other","Unclassified")),]
 
 partime$norm.par <- partime$par / max(partime$par)
 
-# Pathway names API-------------------------------------------------------------
+# Pathway names API ####
 
 Pathway_activate <- TRUE
 
 if(Pathway_activate){
-  source("pathway_API.R")
-  
   top_kos <- top5.vec
   
   name <- character(length=0)
   class <- character(length=0)
-  rel_paths <- character(length=0)
   
   for(i in 1:length(top_kos)) {
-    
-    pathway <- pathway_API(top_kos[i])
-    name[i] <- pathway$name
-    class[i] <- pathway$class
-    rel_paths[i] <- pathway$Rel_paths[1]
+    pathway <- system(paste0("curl https://rest.kegg.jp/get/", top_kos[[i]]), intern=TRUE)
+    name[[i]] <- pathway[[4]]
+    class[[i]] <-pathway[[5]]
   }
   
-  topkos_w_info <-data.frame(top_kos, name, class, rel_paths)
+  topkos_w_info <-data.frame(top_kos, name, class)
+  
+  source("split_function.R")
+  
+  unlist(split_function(topkos_w_info$name[1],"        "))[2]
+  
+  for(i in 1:nrow(topkos_w_info)){
+    if(i == 1){
+     path_names <- rep(NA,nrow(topkos_w_info)) 
+    }
+    
+    path_names[i] <- unlist(split_function(topkos_w_info$name[i],"        "))[2]
+    
+    if(i == nrow(topkos_w_info)){
+      topkos_w_info$name <- path_names
+    }
+  }
   
   for(i in 1:nrow(dfOut2)){
     if(i == 1){
       path_names <- rep(NA,nrow(dfOut2))
     }
     
-    if(dfOut2$kegg.vec[i] %in% c("Unclassified","Other")){
-      path_names[i] <- dfOut2$kegg.vec[i]
-    }else{
-      path_names[i] <- topkos_w_info$name[topkos_w_info$top_kos == dfOut2$kegg.vec[i]]
-    }
+    path_names[i] <- topkos_w_info$name[topkos_w_info$top_kos == dfOut2$kegg.vec[i]]
   }
   
   for(i in 1:length(top5.vec)){
@@ -1203,9 +1186,7 @@ if(Pathway_activate){
   dfOut2$kegg.vec <- path_names
 }
 
-# Create Plot ------------------------------------------------------------------
-
-dfOut2 <- dfOut2[!(dfOut2$kegg.vec %in% c("Unclassified","Other")),]
+# Create Plot ####
 
 p6 <- ggplot(dfOut2)+
   geom_bar(aes(fill = factor(kegg.vec,
@@ -1215,9 +1196,8 @@ p6 <- ggplot(dfOut2)+
            position = "stack", stat = "identity")+
   scale_x_continuous(breaks = unique(meta.data$datetime),
                      labels = unique(meta.data$AssemblyGroup))+
-  scale_fill_manual(values = c(brewer.pal(12,"Set3"),
-                               brewer.pal(8,"Set2"),
-                               brewer.pal(9,"Set1")))+
+  scale_color_manual(values = c("Other" = "black",
+                              "Unclassified" = "grey"))+
   labs(title = "All Eukaryotes",
        y = "Fraction of TPM",
        x = "Time of sample",
@@ -1227,12 +1207,26 @@ p6 <- ggplot(dfOut2)+
                                    vjust = 0.5,
                                    hjust=1))+
   guides(fill = guide_legend(title = "kegg"),
-         alpha = "none")
+         alpha = "none")+
+  geom_point(data = dfOut2_O.U,
+             aes(y = Count,
+                 x = datetime,
+                 color = kegg.vec,
+                 shape = kegg.vec))
+
+# scale <- max(partime$par)
+# 
+# p6 <- p6 +
+#   geom_line(data = partime,
+#             aes(x = lubri,
+#                 y = norm.par,
+#                 alpha = 0.5))+
+#   scale_y_continuous(sec.axis = sec_axis(~.*scale, name = "Secondary Y-axis"))
 
 p6
 
 save_name <- "KO_plots/AllEuk_topKO.png"
-ggsave(save_name,width = 10,height = 5,dpi = 300)
+# ggsave(save_name,width = 10,height = 5,dpi = 300)
 ```
 
 
@@ -1243,28 +1237,25 @@ Genus_of_interest <- c("Paraglaciecola","Colwellia")
 
 df.merged <- Euk.Sub
 
-df.merged$KEGG1[df.merged$KEGG1 == "-"] <- "Unclassified"
+kegg.vec <- unique(df.merged$K1_path)
+n <- length(kegg.vec)
 
 #Counting TPM for keggs for each order of interest####
 df.merged_copy <- df.merged
-df.merged_NoNA <- df.merged_copy[!is.na(df.merged_copy$Order),]
+df.merged_NoNA <- df.merged_copy[!is.na(df.merged_copy$Class),]
 
-for(order_idx in Order_of_interest){
+for(order_idx in Class_of_interest){
   
-  order_filter <- df.merged_NoNA$Order == order_idx
+  order_filter <- df.merged_NoNA$Class == order_idx
   
   df.merged <- df.merged_NoNA[order_filter,]
-  
-  kegg.vec <- unique(df.merged$KEGG1)
-
-  n <- length(kegg.vec)
   
   day.vec <- paste(meta.data$SampleID,"_quant",sep = "")
   m <- length(day.vec)
   
   for(i in 1:n){ #Looping through the Classes to count the occurrences.
     
-    kegg.filter <- df.merged$KEGG1 == kegg.vec[i]
+    kegg.filter <- df.merged$K1_path == kegg.vec[i]
     df.temp <- df.merged[kegg.filter,]
     
     for(j in 1:m){ #Looping through the sampling time points.
@@ -1283,9 +1274,11 @@ for(order_idx in Order_of_interest){
     }
   }
   
-  df.count2 <- df.count[df.count$kegg.vec != "Unclassified",]
-
-  top5.vec <- df.count2$kegg.vec[order(apply(df.count2[,-ncol(df.count2)],1,sum),decreasing = TRUE)[1:5]]
+  df.merged2 <- df.merged[df.merged$K1_path != "Unclassified",]
+  
+  # df.merged2 <- df.merged
+  
+  top5.vec <- names(table(df.merged2$K1_path)[order(-table(df.merged2$K1_path))[1:5]])
   
   top5.filter <- df.count$kegg.vec %in% c(top5.vec,"Unclassified")
   # top5.filter <- df.count$kegg.vec %in% c(top5.vec)
@@ -1326,7 +1319,7 @@ for(order_idx in Order_of_interest){
   name_vec <- paste("dfOut2_",order_idx,sep = "")
   assign(name_vec,dfOut2,envir = globalenv())
   
-  if(order_idx == Order_of_interest[1]){
+  if(order_idx == Class_of_interest[1]){
     dfOut3 <- dfOut2
   }else{
     dfOut3 <- rbind.data.frame(dfOut3,dfOut2)
@@ -1336,39 +1329,49 @@ for(order_idx in Order_of_interest){
 
 level_vec <- unique(dfOut3$kegg.vec)[!(unique(dfOut3$kegg.vec) %in% c("Unclassified","Other"))]
 
-# Pathway names API-------------------------------------------------------------
+dfOut_O.U <- dfOut3[(dfOut3$kegg.vec %in% c("Unclassified","Other")),]
+dfOut3 <- dfOut3[!(dfOut3$kegg.vec %in% c("Unclassified","Other")),]
+
+# Pathway names API ####
 
 Pathway_activate <- TRUE
 
 if(Pathway_activate){
-  source("pathway_API.R")
-  
   top_kos <- level_vec
   
   name <- character(length=0)
   class <- character(length=0)
-  rel_paths <- character(length=0)
   
   for(i in 1:length(top_kos)) {
-    
-    pathway <- pathway_API(top_kos[i])
-    name[i] <- pathway$name
-    class[i] <- pathway$class
-    rel_paths[i] <- pathway$Rel_paths[1]
+    pathway <- system(paste0("curl https://rest.kegg.jp/get/", top_kos[[i]]), intern=TRUE)
+    name[[i]] <- pathway[[4]]
+    class[[i]] <-pathway[[5]]
   }
   
-  topkos_w_info <-data.frame(top_kos, name, class, rel_paths)
+  topkos_w_info <-data.frame(top_kos, name, class)
+  
+  source("split_function.R")
+  
+  unlist(split_function(topkos_w_info$name[1],"        "))[2]
+  
+  for(i in 1:nrow(topkos_w_info)){
+    if(i == 1){
+     path_names <- rep(NA,nrow(topkos_w_info)) 
+    }
+    
+    path_names[i] <- unlist(split_function(topkos_w_info$name[i],"        "))[2]
+    
+    if(i == nrow(topkos_w_info)){
+      topkos_w_info$name <- path_names
+    }
+  }
   
   for(i in 1:nrow(dfOut3)){
     if(i == 1){
       path_names <- rep(NA,nrow(dfOut3))
     }
     
-    if(dfOut3$kegg.vec[i] %in% c("Unclassified","Other")){
-      path_names[i] <- dfOut3$kegg.vec[i]
-    }else{
-      path_names[i] <- topkos_w_info$name[topkos_w_info$top_kos == dfOut3$kegg.vec[i]]
-    }
+    path_names[i] <- topkos_w_info$name[topkos_w_info$top_kos == dfOut3$kegg.vec[i]]
   }
   
   for(i in 1:length(level_vec)){
@@ -1381,9 +1384,7 @@ if(Pathway_activate){
   dfOut3$kegg.vec <- path_names
 }
 
-# Create Plot ------------------------------------------------------------------
-
-dfOut3 <- dfOut3[!(dfOut3$kegg.vec %in% c("Unclassified","Other")),]
+# Create Plot ####
 
 p7 <- ggplot(dfOut3)+
   geom_bar(aes(fill = factor(kegg.vec,
@@ -1392,11 +1393,14 @@ p7 <- ggplot(dfOut3)+
                y = Count,
                x = datetime),
            position = "stack", stat = "identity")+
+  geom_point(data = dfOut_O.U,
+             aes(x = datetime,
+                 y = Count,
+                 color = kegg.vec))+
   scale_x_continuous(breaks = unique(meta.data$datetime),
                      labels = unique(meta.data$AssemblyGroup))+
-  scale_fill_manual(values = c(brewer.pal(12,"Set3"),
-                               brewer.pal(8,"Set2"),
-                               brewer.pal(9,"Set1")))+
+  scale_color_manual(values = c("Other" = "black",
+                              "Unclassified" = "grey"))+
   facet_wrap(facets = "Facet_name",
              nrow = 2,
              ncol = 2,
@@ -1415,7 +1419,7 @@ p7 <- ggplot(dfOut3)+
 p7
 
 save_name <- "KO_plots/FourEuk_topKO.png"
-ggsave(save_name,width = 10,height = 5,dpi = 300)
+# ggsave(save_name,width = 10,height = 5,dpi = 300)
 ```
 
 ```{r}
@@ -1619,58 +1623,6 @@ for(i in 1:First_length){
   }
 }
 ```
-```{r}
-# Kegg Path lookup####
-
-Euk_KO_paths <- read.csv("KO_pathway_Euk.csv")
-
-for(i in 1:nrow(Euk.Sub)){
-  if(i == 1){
-    Ko_path <- rep(NA,nrow(Euk.Sub))
-  }
-
-  vec <- Euk.Sub$KEGG1[i]
-
-  vec_paths <- Euk_KO_paths$ko[Euk_KO_paths$K1 == vec]
-
-  if(vec == "-"){
-    vec_paths <- ""
-  }
-
-  if(vec_paths == ""){
-    for(j in 2:length(KEGG_columns)){
-      if(j == 2){
-        stop_vec <- TRUE
-      }
-
-      if(stop_vec){
-        vec <- Euk.Sub[i,KEGG_columns[j]]
-
-        if(is.na(vec)){
-          stop_vec <- FALSE
-          vec_paths <- ""
-        } else {
-          vec_paths <- Euk_KO_paths$ko[Euk_KO_paths$K1 == vec]
-        }
-
-        if(vec_paths != ""){
-          stop_vec <- FALSE
-        }
-      }
-    }
-
-
-  }
-  if(vec_paths == ""){
-    vec_paths <- "Unclassified"
-  }
-
-  Ko_path[i] <- vec_paths
-}
-
-Euk.Sub$K1_path <- Ko_path
-```
-
 
 ```{r}
 
@@ -1712,9 +1664,11 @@ for(i in 1:n){ #Looping through the Classes to count the occurrences.
 
 #-------------------------------------------------------------------------------
 
-df.count2 <- df.count[df.count$kegg.vec != "Unclassified",]
+df.merged2 <- df.merged[df.merged$K1_path != "Unclassified",]
 
-top5.vec <- df.count2$kegg.vec[order(apply(df.count2[,-ncol(df.count2)],1,sum),decreasing = TRUE)[1:10]]
+# df.merged2 <- df.merged
+
+top5.vec <- names(table(df.merged2$K1_path)[order(-table(df.merged2$K1_path))[1:10]])
 
 top5.filter <- df.count$kegg.vec %in% c(top5.vec,"Unclassified")
 # top5.filter <- df.count$kegg.vec %in% c(top5.vec)
@@ -1764,7 +1718,6 @@ if(Pathway_activate){
   
   name <- character(length=0)
   class <- character(length=0)
-  rel_paths <- character(length=0)
   
   for(i in 1:length(top_kos)) {
     
@@ -1784,7 +1737,7 @@ if(Pathway_activate){
     if(dfOut2$kegg.vec[i] %in% c("Unclassified","Other")){
       path_names[i] <- dfOut2$kegg.vec[i]
     }else{
-      path_names[i] <- topkos_w_info$name[topkos_w_info$top_kos == dfOut2$kegg.vec[i]]
+      path_names[i] <- topkos_w_info$rel_paths[topkos_w_info$top_kos == dfOut2$kegg.vec[i]]
     }
   }
   
@@ -1808,10 +1761,7 @@ p6 <- ggplot(dfOut2)+
            position = "stack", stat = "identity")+
   scale_x_continuous(breaks = unique(meta.data$datetime),
                      labels = unique(meta.data$AssemblyGroup))+
-  scale_fill_manual(values = c(brewer.pal(12,"Set3"),
-                               brewer.pal(8,"Set2"),
-                               brewer.pal(9,"Set1")))+
-  labs(title = "Cog Category C, top kegg pathways, all Eukaryotes",
+  labs(title = "All Eukaryotes",
        y = "Fraction of TPM",
        x = "Time of sample",
        caption = "This is a caption")+
@@ -1824,13 +1774,17 @@ p6 <- ggplot(dfOut2)+
 
 p6
 
-save_name <- "KO_plots/Euk_Phot_COG_topKO_path.png"
-ggsave(save_name,width = 10,height = 5,dpi = 300)
 ```
 
 ```{r}
 
+Class_of_interest <- c("Bacillariophyta","Dinophyceae","Prymnesiophyceae","Cryptophyceae")
+Order_of_interest <- c("Bacillariales","Cryptomonadales","Dinophysiales","Phaeocystales")
+Genus_of_interest <- c("Paraglaciecola","Colwellia")
+
 df.merged <- Euk.Sub
+
+df.merged$K1_path <- Ko_path
 
 df.merged$KEGG1[df.merged$KEGG1 == "-"] <- "Unclassified"
 
@@ -1841,10 +1795,14 @@ df.merged <- df.merged[filter,]
 
 n <- length(kegg.vec)
 
-# df.merged <- df.merged[df.merged$KEGG1 != "Unclassified",]
+# df.merged <- df.merged[df.merged$K1_path != "Unclassified",]
 
 day.vec <- paste(meta.data$SampleID,"_quant",sep = "")
 m <- length(day.vec)
+
+for(idx in 1:length(Order_of_interest)){
+  
+
 
 for(i in 1:n){ #Looping through the Classes to count the occurrences.
   
@@ -1867,8 +1825,6 @@ for(i in 1:n){ #Looping through the Classes to count the occurrences.
   }
 }
 
-#-------------------------------------------------------------------------------
-
 df.count2 <- df.count[df.count$kegg.vec != "Unclassified",]
 
 top5.vec <- df.count2$kegg.vec[order(apply(df.count2[,-ncol(df.count2)],1,sum),decreasing = TRUE)[1:10]]
@@ -1908,6 +1864,8 @@ names(Day.Time)[names(Day.Time) == "AssemblyGroup"] <- "Day"
 
 dfOut2 <- merge(df.summ,Day.Time,by = "Day")
 
+}
+
 partime$norm.par <- partime$par / max(partime$par)
 
 # Pathway names API-------------------------------------------------------------
@@ -1921,7 +1879,6 @@ if(Pathway_activate){
   
   name <- character(length=0)
   class <- character(length=0)
-  rel_paths <- character(length=0)
   
   for(i in 1:length(top_kos)) {
     
@@ -1957,8 +1914,6 @@ if(Pathway_activate){
 
 # Create Plot ------------------------------------------------------------------
 
-dfOut2 <- dfOut2[!(dfOut2$kegg.vec %in% c("Unclassified","Other")),]
-
 p6 <- ggplot(dfOut2)+
   geom_bar(aes(fill = factor(kegg.vec,
                              levels = c("Unclassified","Other",top5.vec)),
@@ -1967,10 +1922,8 @@ p6 <- ggplot(dfOut2)+
            position = "stack", stat = "identity")+
   scale_x_continuous(breaks = unique(meta.data$datetime),
                      labels = unique(meta.data$AssemblyGroup))+
-  scale_fill_manual(values = c(brewer.pal(12,"Set3"),
-                               brewer.pal(8,"Set2"),
-                               brewer.pal(9,"Set1")))+
-  labs(title = "Cog Category C, top keggs, all Eukaryotes",
+  scale_fill_manual(values = c(brewer.pal(12,"Set3")))+
+  labs(title = "All Eukaryotes",
        y = "Fraction of TPM",
        x = "Time of sample",
        caption = "This is a caption")+
@@ -1982,197 +1935,6 @@ p6 <- ggplot(dfOut2)+
          alpha = "none")
 
 p6
-
-save_name <- "KO_plots/Euk_Phot_COG_topKO.png"
-ggsave(save_name,width = 10,height = 5,dpi = 300)
-```
-
-```{r}
-
-Class_of_interest <- c("Bacillariophyta","Dinophyceae","Prymnesiophyceae","Cryptophyceae")
-Order_of_interest <- c("Bacillariales","Cryptomonadales","Dinophysiales","Phaeocystales")
-Genus_of_interest <- c("Paraglaciecola","Colwellia")
-
-df.merged <- Euk.Sub
-
-df.merged$KEGG1[df.merged$KEGG1 == "-"] <- "Unclassified"
-df.merged$Order[is.na(df.merged$Order)] <- "Unclassified"
-
-filter <- grepl("C",df.merged$COG_category)
-df.merged <- df.merged[filter,]
-
-#Counting TPM for keggs for each order of interest####
-df.merged_copy <- df.merged
-df.merged_NoNA <- df.merged_copy[!is.na(df.merged_copy$Order),]
-
-for(order_idx in Order_of_interest){
-  
-  order_filter <- df.merged_NoNA$Order == order_idx
-  
-  df.merged <- df.merged_NoNA[order_filter,]
-  
-  kegg.vec <- unique(df.merged$KEGG1)
-  
-  n <- length(kegg.vec)
-  
-  day.vec <- paste(meta.data$SampleID,"_quant",sep = "")
-  m <- length(day.vec)
-  
-  for(i in 1:n){ #Looping through the Classes to count the occurrences.
-    
-    kegg.filter <- df.merged$KEGG1 == kegg.vec[i]
-    df.temp <- df.merged[kegg.filter,]
-    
-    for(j in 1:m){ #Looping through the sampling time points.
-      
-      if(i == 1 & j == 1){ #Sets up an empty data.frame to input the data
-        
-        df.count <- data.frame(matrix(ncol = m, nrow = n))
-        names(df.count) <- meta.data$SampleName
-        
-        df.count <- cbind(df.count,kegg.vec)
-      }
-      
-      df.count[i,j] <- sum(df.temp[,day.vec[j]])/sum(df.merged[,day.vec[j]])
-      # df.count[i,j] <- sum(df.temp[,day.vec[j]])
-      
-    }
-  }
-  
-  df.count2 <- df.count[df.count$kegg.vec != "Unclassified",]
-  
-  top5.vec <- df.count2$kegg.vec[order(apply(df.count2[,-ncol(df.count2)],1,sum),decreasing = TRUE)[1:5]]
-  
-  top5.filter <- df.count$kegg.vec %in% c(top5.vec,"Unclassified")
-  # top5.filter <- df.count$kegg.vec %in% c(top5.vec)
-  
-  df.top5 <- df.count[top5.filter,]
-  df.other <- df.count[!top5.filter,]
-  
-  df.count2 <- rbind(df.top5,c(colSums(df.other[,1:24]),"Other"))
-  
-  order.vec <- c("Day1_afternoon",
-                 "Day1_evening",
-                 "Day1_night",
-                 "Day1_morning",
-                 "Day2_night",
-                 "Day2_morning",
-                 "Day2_afternoon",
-                 "Day2_evening")
-  
-  dfOut <- pivot_longer(df.count2,
-                        all_of(meta.data$SampleName),
-                        names_to = "Day",
-                        values_to = "Count") %>% 
-    mutate(Count = as.numeric(Count))
-  
-  dfOut$Day <- substring(dfOut$Day,1,nchar(dfOut$Day)-1)
-  
-  df.summ <- summarySE(data = dfOut, "Count",
-                       groupvars = c("Day","kegg.vec"))
-  
-  Day.Time <- meta.data[,c("AssemblyGroup","datetime")] %>% 
-    distinct(AssemblyGroup, .keep_all = TRUE)
-  
-  names(Day.Time)[names(Day.Time) == "AssemblyGroup"] <- "Day"
-  
-  dfOut2 <- merge(df.summ,Day.Time,by = "Day") %>% 
-    mutate(Facet_name = order_idx)
-  
-  name_vec <- paste("dfOut2_",order_idx,sep = "")
-  assign(name_vec,dfOut2,envir = globalenv())
-  
-  if(order_idx == Order_of_interest[1]){
-    dfOut3 <- dfOut2
-  }else{
-    dfOut3 <- rbind.data.frame(dfOut3,dfOut2)
-  }
-}
-#####
-
-level_vec <- unique(dfOut3$kegg.vec)[!(unique(dfOut3$kegg.vec) %in% c("Unclassified","Other"))]
-
-# Pathway names API-------------------------------------------------------------
-
-Pathway_activate <- TRUE
-
-if(Pathway_activate){
-  source("pathway_API.R")
-  
-  top_kos <- level_vec
-  
-  name <- character(length=0)
-  class <- character(length=0)
-  rel_paths <- character(length=0)
-  
-  for(i in 1:length(top_kos)) {
-    
-    pathway <- pathway_API(top_kos[i])
-    name[i] <- pathway$name
-    class[i] <- pathway$class
-    rel_paths[i] <- pathway$Rel_paths[1]
-  }
-  
-  topkos_w_info <-data.frame(top_kos, name, class, rel_paths)
-  
-  for(i in 1:nrow(dfOut3)){
-    if(i == 1){
-      path_names <- rep(NA,nrow(dfOut3))
-    }
-    
-    if(dfOut3$kegg.vec[i] %in% c("Unclassified","Other")){
-      path_names[i] <- dfOut3$kegg.vec[i]
-    }else{
-      path_names[i] <- topkos_w_info$name[topkos_w_info$top_kos == dfOut3$kegg.vec[i]]
-    }
-  }
-  
-  for(i in 1:length(level_vec)){
-    
-    vec <- topkos_w_info$name[topkos_w_info$top_kos == level_vec[i]]
-    
-    level_vec[i] <- vec
-  }
-  
-  dfOut3$kegg.vec <- path_names
-}
-
-# Create Plot ------------------------------------------------------------------
-
-dfOut3 <- dfOut3[!(dfOut3$kegg.vec %in% c("Unclassified","Other")),]
-
-p6 <- ggplot(dfOut3)+
-  geom_bar(aes(fill = factor(kegg.vec,
-                             levels = c("Unclassified","Other",level_vec)
-                             ),
-               y = Count,
-               x = datetime),
-           position = "stack", stat = "identity")+
-  scale_x_continuous(breaks = unique(meta.data$datetime),
-                     labels = unique(meta.data$AssemblyGroup))+
-  scale_fill_manual(values = c(brewer.pal(12,"Set3"),
-                               brewer.pal(8,"Set2"),
-                               brewer.pal(9,"Set1"),
-                               brewer.pal(9,"Paired")))+
-  facet_wrap(facets = "Facet_name",
-             nrow = 2,
-             ncol = 2,
-             scales = "free_y")+
-  labs(title = "Cog Category C, top keggs",
-       y = "Fraction of TPM",
-       x = "Time of sample")+
-  theme_classic()+
-  theme(axis.text.x = element_text(angle = 90,
-                                   vjust = 0.5,
-                                   hjust=1))+
-  guides(fill = guide_legend(title = "Pathway"),
-         alpha = "none",
-         color = guide_legend(title = "Shape"))
-
-p6
-
-save_name <- "KO_plots/FourEuk_Phot_COG_topKO.png"
-ggsave(save_name,width = 12,height = 5,dpi = 300)
 ```
 
 
