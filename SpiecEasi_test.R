@@ -1,4 +1,4 @@
-library(devtools)
+# library(devtools)
 # install_github("zdk123/SpiecEasi")
 library(SpiecEasi)
 
@@ -17,13 +17,20 @@ library(SpiecEasi)
 # 
 # Obviously, for real data, skip 1-4.
 
-data(amgut1.filt)
-depths <- rowSums(amgut1.filt)
-amgut1.filt.n  <- t(apply(amgut1.filt, 1, norm_to_total))
-amgut1.filt.cs <- round(amgut1.filt.n * min(depths))
+load("Cellvibrio_test.RData",verbose = TRUE)
+rownames(df.count) <- df.count$kegg.vec
 
-d <- ncol(amgut1.filt.cs)
-n <- nrow(amgut1.filt.cs)
+
+Cellvibrio <- t(df.count[sample(nrow(df.count),24),-ncol(df.count)])
+# Cellvibrio <- as.matrix(df.count[,-ncol(df.count)])
+rm(df.count)
+
+depths <- rowSums(Cellvibrio)
+Cellvibrio.n  <- t(apply(Cellvibrio, 1, norm_to_total))
+Cellvibrio.cs <- round(Cellvibrio.n * min(depths))
+
+d <- ncol(Cellvibrio.cs)
+n <- nrow(Cellvibrio.cs)
 e <- d
 
 #-------------------------------------------------------------------------------
@@ -34,7 +41,7 @@ graph <- make_graph('cluster', d, e)
 Prec  <- graph2prec(graph)
 Cor   <- cov2cor(prec2cov(Prec))
 
-X <- synth_comm_from_counts(amgut1.filt.cs, mar=2, distr='zinegbin', Sigma=Cor, n=n)
+X <- synth_comm_from_counts(Cellvibrio.cs, mar=2, distr='zinegbin', Sigma=Cor, n=n)
 
 #-------------------------------------------------------------------------------
 # the main SPIEC-EASI pipeline: Data transformation, sparse inverse covariance estimation and model selection
@@ -69,11 +76,11 @@ stars.pr(getOptMerge(se), graph, verbose=FALSE)
 # supply a number to ncores. Also, let’s compare results from the MB and glasso
 # methods as well as SparCC (correlation).
 
-se.mb.amgut <- spiec.easi(amgut1.filt, method='mb', lambda.min.ratio=1e-2,
+se.mb.amgut <- spiec.easi(Cellvibrio, method='mb', lambda.min.ratio=1e-2,
                           nlambda=20, pulsar.params=list(rep.num=50))
-se.gl.amgut <- spiec.easi(amgut1.filt, method='glasso', lambda.min.ratio=1e-2,
+se.gl.amgut <- spiec.easi(Cellvibrio, method='glasso', lambda.min.ratio=1e-2,
                           nlambda=20, pulsar.params=list(rep.num=50))
-sparcc.amgut <- sparcc(amgut1.filt)
+sparcc.amgut <- sparcc(Cellvibrio)
 ## Define arbitrary threshold for SparCC correlation matrix for the graph
 sparcc.graph <- abs(sparcc.amgut$Cor) >= 0.3
 diag(sparcc.graph) <- 0
@@ -89,11 +96,16 @@ ig.sparcc <- adj2igraph(sparcc.graph)
 
 library(igraph)
 ## set size of vertex proportional to clr-mean
-vsize    <- rowMeans(clr(amgut1.filt, 1))+6
+vsize    <- rowMeans(clr(Cellvibrio, 1))+6
 am.coord <- layout_with_fr(ig.mb)
 
 par(mfrow=c(1,3))
-plot(ig.mb, layout=am.coord, vertex.size=vsize, vertex.label=NA, main="MB")
+# plot(ig.mb, layout=am.coord, vertex.size=vsize, vertex.label=NA, main="MB")
+
+plot(ig.mb, vertex.size=vsize, vertex.label.dist=1.1,
+     vertex.label.cex=0.5,
+     vertex.label.color="black", main="R1+R2 glasso", layout=am.coord)
+
 plot(ig.gl, layout=am.coord, vertex.size=vsize, vertex.label=NA, main="glasso")
 plot(ig.sparcc, layout=am.coord, vertex.size=vsize, vertex.label=NA, main="sparcc")
 
@@ -122,7 +134,7 @@ dd.gl     <- degree_distribution(ig.gl)
 dd.mb     <- degree_distribution(ig.mb)
 dd.sparcc <- degree_distribution(ig.sparcc)
 
-plot(0:(length(dd.sparcc)-1), dd.sparcc, ylim=c(0,.35), type='b',
+plot(0:(length(dd.sparcc)-1), dd.sparcc, ylim=c(0,1), type='b',
      ylab="Frequency", xlab="Degree", main="Degree Distributions")
 points(0:(length(dd.gl)-1), dd.gl, col="red" , type='b')
 points(0:(length(dd.mb)-1), dd.mb, col="forestgreen", type='b')
