@@ -1,6 +1,8 @@
 # library(devtools)
 # install_github("zdk123/SpiecEasi")
+# install_github("jbisanz/qiime2R")
 library(SpiecEasi)
+library(qiime2R)
 
 #-------------------------------------------------------------------------------
 # Lets simulate some multivariate data under zero-inflated negative binomial model,
@@ -21,8 +23,8 @@ load("Cellvibrio_test.RData",verbose = TRUE)
 rownames(df.count) <- df.count$kegg.vec
 
 
-Cellvibrio <- t(df.count[sample(nrow(df.count),24),-ncol(df.count)])
-# Cellvibrio <- as.matrix(df.count[,-ncol(df.count)])
+# Cellvibrio <- t(df.count[sample(nrow(df.count),24),-ncol(df.count)])
+Cellvibrio <- as.matrix(df.count[,-ncol(df.count)])
 rm(df.count)
 
 depths <- rowSums(Cellvibrio)
@@ -103,7 +105,7 @@ par(mfrow=c(1,3))
 # plot(ig.mb, layout=am.coord, vertex.size=vsize, vertex.label=NA, main="MB")
 
 plot(ig.mb, vertex.size=vsize, vertex.label.dist=1.1,
-     vertex.label.cex=0.5,
+     vertex.label.cex=1,
      vertex.label.color="black", main="R1+R2 glasso", layout=am.coord)
 
 plot(ig.gl, layout=am.coord, vertex.size=vsize, vertex.label=NA, main="glasso")
