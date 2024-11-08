@@ -12,7 +12,8 @@ rm(list = ls())
 
 package.list <- c("dplyr","tidyverse","ggplot2",
                   "lemon","vegan","Rmisc",
-                  "lubridate","patchwork","stringi")
+                  "lubridate","patchwork","stringi",
+                  "RColorBrewer")
 
 if(!all(package.list %in% installed.packages()[,"Package"])){
   install.packages(package.list[!(package.list %in% installed.packages()[,"Package"])])
@@ -34,83 +35,97 @@ library(lemon)
 library(vegan)
 library(Rmisc)
 library(lubridate)
+library(RColorBrewer)
 
 library(phyloseq)
 library(patchwork)
 library(DESeq2)
 library(stringi)
 
-#Loading the meta.data: meta.data1 is the Assmebly group and the sequencing ID (sample ID),
-#meta.data2 is the data about sampling time and site.
+load("CSV_files/Subsections.RData",verbose = TRUE)
+```
 
-meta.data1 <- read.csv("CSV_files/dielRNA_eukrythmic.tsv", sep = "\t")
-meta.data2 <- read.csv("sample_metadata.csv") %>% 
-  mutate(Sample_ID = paste("HM",Sample_ID,sep = ""))
-
-names(meta.data2)[names(meta.data2) == "Sample_ID"] <- "SampleID"
-
-#Combining meta.data1 and meta.data2 and making the lubri string a data + time saved in datetime
-meta.data <- merge(meta.data1,meta.data2,by = "SampleID") %>% 
-  mutate(datetime = ymd(substring(lubri,1,10))+hms(substring(lubri,12,19)))
-
-meta.data <- separate(meta.data, col = AssemblyGroup, into = c("Day.num","ToD"),sep = "_",remove = FALSE, fill = "right", extra = "drop")
-
-# meta.data$lubri <- with_tz(mdy_hms(meta.data$datetime, tz = "UTC"),
-#                            tz = "America/Santiago")
-
-COG_categories <- read.csv("COG_categories.csv",sep = ";")
-
-Full.merged <- read.csv("CSV_files/Full.merged.csv")
-
-par1 <- read.delim("NBP2113pguv.d342",  sep = " ", header =FALSE)
-par2<- read.delim("NBP2113pguv.d343",  sep = " ", header =FALSE)
-par3<- read.delim("NBP2113pguv.d344",  sep = " ", header =FALSE)
-
-par = rbind(par1, par2, par3)[-1,c(1,2,3,10)]
-names(par) <- c("juliendatetime","date", "time", "par")
-
-partime <- par %>% 
-  separate(juliendatetime, c("yearday","hour", "min", "sec"), sep = ":" ) %>% 
-  unite(utctime, hour, min, sec, sep=":")  %>% 
-  mutate(utcdatetime = paste(date, utctime))
-
-partime$lubri <- with_tz(mdy_hms(partime$utcdatetime, tz = "UTC"),
-                         tz = "America/Santiago")
-
-for(i in 1:nrow(meta.data)){
-
-  filter.above <- partime$lubri >= meta.data$datetime[i]
-  filter.below <- partime$lubri < meta.data$datetime[i]
-  
-  vec.above <- partime[partime$lubri == min(partime$lubri[filter.above]),]
-  vec.below <- partime[partime$lubri == max(partime$lubri[filter.below]),]
-  
-  meta.data$par[i] <- mean(vec.above$par,vec.below$par)
-  
-}
-
-m <- 1
-time.int <- ms("05.00")
-for(i in 1:nrow(partime)){
-  if(i == 1){
-    vec <- NA
-    vec.slide <- NA
-    n <- 1
-  }
-  
-  test.vec <- partime$lubri[i] - partime$lubri[m]
-  
-  if(test.vec > time.int){
-    m <- i
-    
-    vec[n] <- i
-    
-    n <- n+1
-  }
-  
-}
-
-partime <- partime[vec,]
+```{r}
+# #Loading the meta.data: meta.data1 is the Assmebly group and the sequencing ID (sample ID),
+# #meta.data2 is the data about sampling time and site.
+# 
+# meta.data1 <- read.csv("CSV_files/dielRNA_eukrythmic.tsv", sep = "\t")
+# meta.data2 <- read.csv("sample_metadata.csv") %>%
+#   mutate(Sample_ID = paste("HM",Sample_ID,sep = ""))
+# 
+# names(meta.data2)[names(meta.data2) == "Sample_ID"] <- "SampleID"
+# 
+# #Combining meta.data1 and meta.data2 and making the lubri string a data + time saved in datetime
+# meta.data <- merge(meta.data1,meta.data2,by = "SampleID") %>%
+#   mutate(datetime = ymd(substring(lubri,1,10))+hms(substring(lubri,12,19)))
+# 
+# meta.data <- separate(meta.data, col = AssemblyGroup, into = c("Day.num","ToD"),sep = "_",remove = FALSE, fill = "right", extra = "drop")
+# 
+# # meta.data$lubri <- with_tz(mdy_hms(meta.data$datetime, tz = "UTC"),
+# #                            tz = "America/Santiago")
+# 
+# COG_categories <- read.csv("COG_categories.csv",sep = ";")
+# 
+# Full.merged <- read.csv("CSV_files/Full.merged.csv")
+# 
+# par1 <- read.delim("NBP2113pguv.d342",  sep = " ", header =FALSE)
+# par2<- read.delim("NBP2113pguv.d343",  sep = " ", header =FALSE)
+# par3<- read.delim("NBP2113pguv.d344",  sep = " ", header =FALSE)
+# 
+# par = rbind(par1, par2, par3)[-1,c(1,2,3,10)]
+# names(par) <- c("juliendatetime","date", "time", "par")
+# 
+# partime <- par %>%
+#   separate(juliendatetime, c("yearday","hour", "min", "sec"), sep = ":" ) %>%
+#   unite(utctime, hour, min, sec, sep=":")  %>%
+#   mutate(utcdatetime = paste(date, utctime))
+# 
+# partime$lubri <- with_tz(mdy_hms(partime$utcdatetime, tz = "UTC"),
+#                          tz = "America/Santiago")
+# 
+# for(i in 1:nrow(meta.data)){
+# 
+#   filter.above <- partime$lubri >= meta.data$datetime[i]
+#   filter.below <- partime$lubri < meta.data$datetime[i]
+# 
+#   vec.above <- partime[partime$lubri == min(partime$lubri[filter.above]),]
+#   vec.below <- partime[partime$lubri == max(partime$lubri[filter.below]),]
+# 
+#   meta.data$par[i] <- mean(vec.above$par,vec.below$par)
+# 
+# }
+# 
+# m <- 1
+# time.int <- ms("05.00")
+# for(i in 1:nrow(partime)){
+#   if(i == 1){
+#     vec <- NA
+#     vec.slide <- NA
+#     n <- 1
+#   }
+# 
+#   test.vec <- partime$lubri[i] - partime$lubri[m]
+# 
+#   if(test.vec > time.int){
+#     m <- i
+# 
+#     vec[n] <- i
+# 
+#     n <- n+1
+#   }
+# 
+# }
+# 
+# partime <- partime[vec,]
+# 
+# #Creating subsections####
+# 
+# Prok.Sub <- Full.merged[Full.merged$Domain != "Eukaryota",]
+# Euk.Sub <- Full.merged[Full.merged$Domain == "Eukaryota",]
+# Bact.Sub <- Full.merged[Full.merged$Domain == "Bacteria",]
+# 
+# # save(Bact.Sub,Prok.Sub,Euk.Sub,meta.data,partime,file = "CSV_files/Subsections.RData")
+# # save(Full.merged,meta.data,partime,file = "CSV_files/Full.merged.RData")
 ```
 
 
@@ -201,15 +216,6 @@ partime <- partime[vec,]
 # write.csv(df.merged,"CSV_files/Full.merged.csv",row.names = F)
 ```
 
-```{r Subsetting full.merged}
-
-Prok.Sub <- Full.merged[Full.merged$Domain != "Eukaryota",]
-Euk.Sub <- Full.merged[Full.merged$Domain == "Eukaryota",]
-Bact.Sub <- Full.merged[Full.merged$Domain == "Bacteria",]
-
-```
-
-
 ```{r Cleaning categories}
 # 
 # Full.noRep$Class <- ifelse(substring(Full.noRep$Class,nchar(Full.noRep$Class)-7) == " (Class)",
@@ -226,8 +232,6 @@ Bact.Sub <- Full.merged[Full.merged$Domain == "Bacteria",]
 ```
 
 ```{r}
-Bact.Sub <- Full.merged[Full.merged$Domain == "Bacteria",]
-
 source("split_function.R")
 
 # Setting up and splitting kegg columns ####
