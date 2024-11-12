@@ -43,6 +43,7 @@ library(DESeq2)
 library(stringi)
 
 load("CSV_files/Subsections.RData",verbose = TRUE)
+load("CSV_files/Full.merged.RData",verbose = TRUE)
 ```
 
 ```{r}
