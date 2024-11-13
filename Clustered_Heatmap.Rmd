@@ -147,8 +147,9 @@ df.merged2 <- df.merged[!is.na(df.merged$Family),filter]
 
 kegg.paths <- unique(df.merged2$K1_path)
 # kegg.paths2 <- rownames(df.count)
+# save(kegg.paths2,file = "kegg.paths2.RData")
 
-source("pathway_API.R")
+# source("pathway_API.R")
 
 Euk.Families <- unique(df.merged2$Family)
 
@@ -246,6 +247,7 @@ kegg.paths <- unique(df.merged$K1_path)
 Euk.Families <- unique(df.merged$Family)
 
 n <- length(Euk.Families)
+# n <- length(kegg.paths)
 m <- length(AssemblyGroups)
 
 #------------------------------------------------------------------------------
@@ -253,6 +255,8 @@ for(i in 1:n){ #Looping through the paths to count the occurrences.
   
   Family.filter <- df.merged$Family == Euk.Families[i]
   df.temp <- df.merged[Family.filter,]
+  # kegg.filter <- df.merged$K1_path == kegg.paths[i]
+  # df.temp <- df.merged[kegg.filter,]
   
   for(j in 1:m){ #Looping through the sampling time points.
     
@@ -261,6 +265,7 @@ for(i in 1:n){ #Looping through the paths to count the occurrences.
      df.count <- data.frame(matrix(ncol = m, nrow = n))
      colnames(df.count) <- AssemblyGroups
      rownames(df.count) <- Euk.Families
+     # rownames(df.count) <- kegg.paths2
      
      
    }
@@ -269,18 +274,28 @@ for(i in 1:n){ #Looping through the paths to count the occurrences.
     
     vec <- sum(df.temp[,Day.filter])
     
-    df.count[i,j] <- ifelse(vec != 0,log(vec),0)
+    df.count[i,j] <- ifelse(vec != 0,log(vec),-6)
     # df.count[i,j] <- sum(df.temp[,day.vec[j]])
     
   }
 }
 
-pheatmap(t(df.count[rownames(df.count) != "Unclassified",]),
+vec_rows <- order(apply(df.count,1,mean),decreasing = TRUE)[1:20]
+# vec_cols <- order(apply(df.count2,2,mean),decreasing = TRUE)
+
+heat_plot <- pheatmap((df.count[vec_rows,]),
          cluster_rows = T, cluster_cols = T, # set to FALSE if you want to remove the dendograms
          clustering_distance_cols = 'euclidean',
          clustering_distance_rows = 'euclidean',
-         clustering_method = 'ward.D')
+         clustering_method = 'ward.D',
+                      fontsize_row = 7,
+                      fontsize_col = 5)
 
+name_vec <- paste0("Heatmaps/","All_pathways.pdf")
+
+pdf(name_vec, height = 25, width = 20)
+heat_plot
+dev.off()
 
 
 ```
