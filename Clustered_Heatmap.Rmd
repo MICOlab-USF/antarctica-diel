@@ -246,17 +246,17 @@ df.merged <- df.merged[!is.na(df.merged$Family),]
 kegg.paths <- unique(df.merged$K1_path)
 Euk.Families <- unique(df.merged$Family)
 
-n <- length(Euk.Families)
-# n <- length(kegg.paths)
+# n <- length(Euk.Families)
+n <- length(kegg.paths)
 m <- length(AssemblyGroups)
 
 #------------------------------------------------------------------------------
 for(i in 1:n){ #Looping through the paths to count the occurrences.
   
-  Family.filter <- df.merged$Family == Euk.Families[i]
-  df.temp <- df.merged[Family.filter,]
-  # kegg.filter <- df.merged$K1_path == kegg.paths[i]
-  # df.temp <- df.merged[kegg.filter,]
+  # Family.filter <- df.merged$Family == Euk.Families[i]
+  # df.temp <- df.merged[Family.filter,]
+  kegg.filter <- df.merged$K1_path == kegg.paths[i]
+  df.temp <- df.merged[kegg.filter,]
   
   for(j in 1:m){ #Looping through the sampling time points.
     
@@ -264,8 +264,8 @@ for(i in 1:n){ #Looping through the paths to count the occurrences.
      
      df.count <- data.frame(matrix(ncol = m, nrow = n))
      colnames(df.count) <- AssemblyGroups
-     rownames(df.count) <- Euk.Families
-     # rownames(df.count) <- kegg.paths2
+     # rownames(df.count) <- Euk.Families
+     rownames(df.count) <- kegg.paths2
      
      
    }
@@ -309,10 +309,443 @@ dev.off()
 
 
 
+```{r}
+Class_of_interest <- c("Bacillariophyta","Dinophyceae","Prymnesiophyceae","Cryptophyceae")
+
+df.merged <- Euk.Sub[Euk.Sub$Class %in% Class_of_interest,]
 
 
 
+for(i in 1:length(Class_of_interest)){
+  
+  filter <- df.merged$Class %in% c(Class_of_interest[-i],"Unclassified")
+  
+  df.Temp <- df.merged[!filter,]
+  
+  kegg.vec <- unique(df.Temp$K1_path)
+  
+  for(j in 1:length(kegg.vec)){
+    if(j == 1){
+      vec <- rep(NA,length(kegg.vec))
+    }
+    
+    vec[j] <- sum(apply(df.Temp[df.Temp$K1_path == kegg.vec[j],2:25],1,mean))
+    
+    if(j == length(kegg.vec)){
+      top10 <- kegg.vec[order(vec,decreasing = TRUE)[1:10]]
+    }
+  }
+  
+  if(i == 1){
+    df_genes <- cbind(top10,
+                      Class_of_interest[i],
+                      paste0(top10,"_",Class_of_interest[i]))
+    
+  } else{
+    df_genes <- rbind(df_genes,
+                      cbind(top10,
+                            Class_of_interest[i],
+                            paste0(top10,"_",Class_of_interest[i])))
+    
+  }
+}
 
+top10_all <- unique(df_genes[,1])
+
+# Pathway API -----------------------------------------------------------------
+source("pathway_API.R")
+
+paths <- unlist(lapply(top10_all,function(x){if(x != "Unclassified"){pathway_API(x)$name}else{"Unclassified"}}))
+
+df_genes <- cbind(df_genes,
+                  unlist(lapply(df_genes[,1], function(x){paths[top10_all == x]})))
+
+names(df_genes) <- c("Pathway","Class","Identifier","Path")
+
+# Start Counting
+
+filter <- paste(df.merged$K1_path,df.merged$Class,sep = "_") %in% df_genes[,3]
+
+df.merged <- df.merged[filter,]
+
+n <- nrow(df_genes)
+sample_vec <- paste0(meta.data$SampleID,"_quant")
+
+m <- length(sample_vec)
+
+for(i in 1:n){
+  filter <- paste(df.merged$K1_path,df.merged$Class,sep = "_") == df_genes[i,3]
+  
+  df.Temp <- df.merged[filter,]
+  
+  for(j in 1:m){
+    if(i == 1 & j == 1){
+      df.count <- matrix(NA,nrow = n,ncol = m)
+      
+      rownames(df.count) <- df_genes[,3]
+      colnames(df.count) <- meta.data$SampleName
+    }
+    
+    df.count[i,j] <- log(sum(df.Temp[,names(df.Temp) == sample_vec[j]]))
+  }
+}
+
+# Heatmap ---------------------------------------------------------------------
+
+Pathway_cols <- c("#1B9E77","#D95F02","#7570B3","#E7298A",
+                  "#66A61E","#E6AB02","#A6761D","#7FC97F",
+                  "#BEAED4","#FDC086","#FFFF99","#386CB0",
+                  "#F0027F","#BF5B17")
+names(Pathway_cols) <- paths
+
+Class_cols <- c('#f0b08f','#60555f','#9fd6e6','#63a375')
+names(Class_cols) <- Class_of_interest
+
+Count_cols <- list("Pathway" = Pathway_cols,
+                   "Class" = Class_cols,
+                   "Day" = c("Day1" = "darkgreen",
+                             "Day2" = "blueviolet"),
+                   "Time.Of.Day" = c("afternoon" = "#F7F4B7",
+                                     "night" = "darkblue",
+                                     "morning" = "#B7E1DD",
+                                     "evening" = "orange"))
+
+Class_df <- data.frame(df_genes[,c(4,2)])
+names(Class_df) <- c("Pathway","Class")
+rownames(Class_df) <- df_genes[,3]
+
+MetaData_df <- data.frame(meta.data[,c(4,5)])
+names(MetaData_df) <- c("Day","Time.Of.Day")
+rownames(MetaData_df) <- meta.data$SampleName
+
+heat_plot <- pheatmap((df.count),
+             col = brewer.pal(10, 'RdYlGn'),
+             cluster_rows = T, cluster_cols = T, # set to FALSE if you want to remove the dendograms
+             clustering_distance_cols = 'euclidean',
+             clustering_distance_rows = 'euclidean',
+             clustering_method = 'ward.D',
+             annotation_row = Class_df,
+             annotation_names_row = T,
+             annotation_col = MetaData_df,
+             annotation_names_col = T,
+             annotation_colors = Count_cols,
+             show_rownames = F, show_colnames = F,
+                          fontsize_row = 7,
+                          fontsize_col = 5,
+             )
+
+
+# name_vec <- paste0("Heatmaps/","Top4Class_Top10Paths.pdf")
+# 
+# pdf(name_vec, height = 10, width = 8)
+# heat_plot
+# dev.off()
+```
+
+```{r}
+Class_of_interest <- c("Bacillariophyta","Dinophyceae","Prymnesiophyceae","Cryptophyceae")
+
+df.merged <- Euk.Sub[Euk.Sub$Class %in% Class_of_interest,]
+df.merged$KEGG1[is.na(df.merged$KEGG1)] <- "Unclassified"
+
+
+for(i in 1:length(Class_of_interest)){
+  
+  filter <- df.merged$Class %in% Class_of_interest[i]
+  
+  df.Temp <- df.merged[filter,]
+  
+  kegg.vec <- unique(df.Temp$K1_path)
+  
+  for(j in 1:length(kegg.vec)){
+    if(j == 1){
+      vec <- rep(NA,length(kegg.vec))
+    }
+    
+    vec[j] <- sum(apply(df.Temp[df.Temp$K1_path == kegg.vec[j],2:25],1,mean))
+    
+    if(j == length(kegg.vec)){
+      top10 <- kegg.vec[order(vec,decreasing = TRUE)[1:10]]
+      
+      for(k in 1:length(top10)){
+        filter <- df.Temp$K1_path == top10[k]
+        
+        df.Temp2 <- df.Temp[filter,]
+        
+        ko.vec <- unique(df.Temp2$KEGG1)
+        
+        for(l in 1:length(ko.vec)){
+          if(l == 1){
+            vec2 <- rep(NA,length(ko.vec))
+          }
+          
+          vec2[l] <- sum(apply(df.Temp2[df.Temp2$KEGG1 == ko.vec[l],2:25],1,mean))
+          
+          if(l == length(ko.vec)){
+            
+            if(length(ko.vec) < 5){
+              top5_ko <- ko.vec[order(vec2,decreasing = TRUE)]
+            }else{
+              top5_ko <- ko.vec[order(vec2,decreasing = TRUE)[1:5]]
+            }
+            
+          }
+        }
+        
+        if(k == 1){
+          top5ko_paths <- cbind(top5_ko,
+                                top10[k])
+        }else{
+          top5ko_paths <- rbind(top5ko_paths,
+                                cbind(top5_ko,
+                                top10[k]))
+        }
+        
+      }
+    }
+  }
+  
+  if(i == 1){
+    df_genes <- cbind(top5ko_paths,
+                      Class_of_interest[i],
+                      paste0(top5ko_paths[,1],"_",Class_of_interest[i]))
+    
+  } else{
+    df_genes <- rbind(df_genes,
+                      cbind(top5ko_paths,
+                            Class_of_interest[i],
+                            paste0(top5ko_paths[,1],"_",Class_of_interest[i])))
+    
+  }
+}
+
+top10_all <- unique(df_genes[,2])
+
+# Pathway API -----------------------------------------------------------------
+source("pathway_API.R")
+
+paths <- unlist(lapply(top10_all,function(x){if(x != "Unclassified"){pathway_API(x)$name}else{"Unclassified"}}))
+
+df_genes <- cbind(df_genes,
+                  unlist(lapply(df_genes[,2], function(x){paths[top10_all == x]})))
+
+names(df_genes) <- c("ko","Pathway","Class","Identifier","Path")
+
+# Start Counting
+
+filter <- paste(df.merged$KEGG1,df.merged$Class,sep = "_") %in% df_genes[,4]
+
+df.merged <- df.merged[filter,]
+
+n <- nrow(df_genes)
+sample_vec <- paste0(meta.data$SampleID,"_quant")
+
+m <- length(sample_vec)
+
+for(i in 1:n){
+  filter <- paste(df.merged$KEGG1,df.merged$Class,sep = "_") == df_genes[i,4]
+  
+  df.Temp <- df.merged[filter,]
+  
+  for(j in 1:m){
+    if(i == 1 & j == 1){
+      df.count <- matrix(NA,nrow = n,ncol = m)
+      
+      rownames(df.count) <- df_genes[,4]
+      colnames(df.count) <- meta.data$SampleName
+    }
+    
+    df.count[i,j] <- log(sum(df.Temp[,names(df.Temp) == sample_vec[j]]))
+  }
+}
+
+# Heatmap ---------------------------------------------------------------------
+
+Pathway_cols <- c("#1B9E77","#D95F02","#7570B3","#E7298A",
+                  "#66A61E","#E6AB02","#A6761D","#7FC97F",
+                  "#BEAED4","#FDC086","#FFFF99","#386CB0",
+                  "#F0027F","#BF5B17")
+# names(Pathway_cols) <- paths
+names(Pathway_cols) <- top10_all
+
+Class_cols <- c('#f0b08f','#60555f','#9fd6e6','#63a375')
+names(Class_cols) <- Class_of_interest
+
+Count_cols <- list("Pathway" = Pathway_cols,
+                   "Class" = Class_cols,
+                   "Day" = c("Day1" = "darkgreen",
+                             "Day2" = "blueviolet"),
+                   "Time.Of.Day" = c("afternoon" = "#F7F4B7",
+                                     "night" = "darkblue",
+                                     "morning" = "#B7E1DD",
+                                     "evening" = "orange"))
+
+Class_df <- data.frame(df_genes[,c(2,3)])
+names(Class_df) <- c("Pathway","Class")
+rownames(Class_df) <- df_genes[,4]
+
+MetaData_df <- data.frame(meta.data[,c(4,5)])
+names(MetaData_df) <- c("Day","Time.Of.Day")
+rownames(MetaData_df) <- meta.data$SampleName
+
+heat_plot <- pheatmap((t(df.count)),
+             col = brewer.pal(10, 'RdYlGn'),
+             cluster_rows = T, cluster_cols = T, # set to FALSE if you want to remove the dendograms
+             clustering_distance_cols = 'euclidean',
+             clustering_distance_rows = 'euclidean',
+             clustering_method = 'ward.D',
+             annotation_col = Class_df,
+             annotation_names_row = T,
+             annotation_row = MetaData_df,
+             annotation_names_col = T,
+             annotation_colors = Count_cols,
+             show_rownames = F, show_colnames = F,
+                          fontsize_row = 7,
+                          fontsize_col = 5,
+             )
+
+
+name_vec <- paste0("Heatmaps/","Top4Class_Top5KO_top10Paths.pdf")
+
+pdf(name_vec, height = 8, width = 12)
+heat_plot
+dev.off()
+```
+
+```{r}
+Class_of_interest <- c("Bacillariophyta","Dinophyceae","Prymnesiophyceae","Cryptophyceae","Dictyochophyceae","Unclassified")
+df.merged <- Euk.Sub
+df.merged$Class[is.na(df.merged$Class)] <- "Unclassified"
+
+df.merged <- df.merged[df.merged$Class %in% Class_of_interest,]
+
+
+
+for(i in 1:length(Class_of_interest)){
+  
+  filter <- df.merged$Class %in% Class_of_interest[i]
+  
+  df.Temp <- df.merged[filter,]
+  
+  kegg.vec <- unique(df.Temp$K1_path)
+  
+  for(j in 1:length(kegg.vec)){
+    if(j == 1){
+      vec <- rep(NA,length(kegg.vec))
+    }
+    
+    vec[j] <- sum(apply(df.Temp[df.Temp$K1_path == kegg.vec[j],2:25],1,mean))
+    
+    if(j == length(kegg.vec)){
+      top10 <- kegg.vec[order(vec,decreasing = TRUE)[1:10]]
+    }
+  }
+  
+  if(i == 1){
+    df_genes <- cbind(top10,
+                      Class_of_interest[i],
+                      paste0(top10,"_",Class_of_interest[i]))
+    
+  } else{
+    df_genes <- rbind(df_genes,
+                      cbind(top10,
+                            Class_of_interest[i],
+                            paste0(top10,"_",Class_of_interest[i])))
+    
+  }
+}
+
+top10_all <- unique(df_genes[,1])
+
+# Pathway API -----------------------------------------------------------------
+source("pathway_API.R")
+
+paths <- unlist(lapply(top10_all,function(x){if(x != "Unclassified"){pathway_API(x)$name}else{"Unclassified"}}))
+
+df_genes <- cbind(df_genes,
+                  unlist(lapply(df_genes[,1], function(x){paths[top10_all == x]})))
+
+names(df_genes) <- c("Pathway","Class","Identifier","Path")
+
+# Start Counting
+
+filter <- paste(df.merged$K1_path,df.merged$Class,sep = "_") %in% df_genes[,3]
+
+df.merged <- df.merged[filter,]
+
+n <- nrow(df_genes)
+sample_vec <- paste0(meta.data$SampleID,"_quant")
+
+m <- length(sample_vec)
+
+for(i in 1:n){
+  filter <- paste(df.merged$K1_path,df.merged$Class,sep = "_") == df_genes[i,3]
+  
+  df.Temp <- df.merged[filter,]
+  
+  for(j in 1:m){
+    if(i == 1 & j == 1){
+      df.count <- matrix(NA,nrow = n,ncol = m)
+      
+      rownames(df.count) <- df_genes[,3]
+      colnames(df.count) <- meta.data$SampleName
+    }
+    
+    df.count[i,j] <- log(sum(df.Temp[,names(df.Temp) == sample_vec[j]]))
+  }
+}
+
+# Heatmap ---------------------------------------------------------------------
+
+Pathway_cols <- c("#1B9E77","#D95F02","#7570B3","#E7298A",
+                  "#66A61E","#E6AB02","#A6761D","#7FC97F",
+                  "#BEAED4","#FDC086","#FFFF99","#386CB0",
+                  "#F0027F","#BF5B17","black")
+names(Pathway_cols) <- paths
+
+Class_cols <- c('#f0b08f','#60555f','#9fd6e6','#63a375',"orange","black")
+names(Class_cols) <- Class_of_interest
+
+Count_cols <- list("Pathway" = Pathway_cols,
+                   "Class" = Class_cols,
+                   "Day" = c("Day1" = "darkgreen",
+                             "Day2" = "blueviolet"),
+                   "Time.Of.Day" = c("afternoon" = "#F7F4B7",
+                                     "night" = "darkblue",
+                                     "morning" = "#B7E1DD",
+                                     "evening" = "orange"))
+
+Class_df <- data.frame(df_genes[,c(4,2)])
+names(Class_df) <- c("Pathway","Class")
+rownames(Class_df) <- df_genes[,3]
+
+MetaData_df <- data.frame(meta.data[,c(4,5)])
+names(MetaData_df) <- c("Day","Time.Of.Day")
+rownames(MetaData_df) <- meta.data$SampleName
+
+heat_plot <- pheatmap((df.count),
+             col = brewer.pal(10, 'RdYlGn'),
+             cluster_rows = T, cluster_cols = T, # set to FALSE if you want to remove the dendograms
+             clustering_distance_cols = 'euclidean',
+             clustering_distance_rows = 'euclidean',
+             clustering_method = 'ward.D',
+             annotation_row = Class_df,
+             annotation_names_row = T,
+             annotation_col = MetaData_df,
+             annotation_names_col = T,
+             annotation_colors = Count_cols,
+             show_rownames = F, show_colnames = F,
+                          fontsize_row = 7,
+                          fontsize_col = 5,
+             )
+
+
+name_vec <- paste0("Heatmaps/","Top6Class_Top10Paths.pdf")
+
+pdf(name_vec, height = 10, width = 8)
+heat_plot
+dev.off()
+```
 
 
 

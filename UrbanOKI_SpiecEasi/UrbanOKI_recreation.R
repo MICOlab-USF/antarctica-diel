@@ -8,7 +8,9 @@ samplemap<- read.csv("UrbanOKI_SpiecEasi/meta.csv")
 samplemap$date <- dmy(samplemap$date)
 samplemap$Month <- as.factor(as.numeric(samplemap$Month))
 
-samplemap <- samplemap %>% mutate(Day=day(date)) %>% unite(Name, c(LandUse, Number, Position, Month, Day), sep = "_", remove = FALSE)
+samplemap <- samplemap %>% 
+  mutate(Day=day(date)) %>% 
+  unite(Name, c(LandUse, Number, Position, Month, Day), sep = "_", remove = FALSE)
 
 samplemap$Position <- factor(samplemap$Position, levels =c("S", "C", "N"))
 samplemap$LandUse <- factor(samplemap$LandUse, levels = c("U", "R"))
