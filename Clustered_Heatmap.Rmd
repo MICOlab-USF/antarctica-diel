@@ -223,6 +223,8 @@ pheatmap(data,
 
 ```
 
+
+
 ```{r test}
 AssemblyGroups <- unique(meta.data$AssemblyGroup)
 
@@ -605,11 +607,11 @@ heat_plot <- pheatmap((t(df.count)),
              )
 
 
-name_vec <- paste0("Heatmaps/","Top4Class_Top5KO_top10Paths.pdf")
-
-pdf(name_vec, height = 8, width = 12)
-heat_plot
-dev.off()
+# name_vec <- paste0("Heatmaps/","Top4Class_Top5KO_top10Paths.pdf")
+# 
+# pdf(name_vec, height = 8, width = 12)
+# heat_plot
+# dev.off()
 ```
 
 ```{r}
@@ -740,13 +742,72 @@ heat_plot <- pheatmap((df.count),
              )
 
 
-name_vec <- paste0("Heatmaps/","Top6Class_Top10Paths.pdf")
-
-pdf(name_vec, height = 10, width = 8)
-heat_plot
-dev.off()
+# name_vec <- paste0("Heatmaps/","Top6Class_Top10Paths.pdf")
+# 
+# pdf(name_vec, height = 10, width = 8)
+# heat_plot
+# dev.off()
 ```
 
+```{r}
+# Setting up and splitting kegg columns ####
+
+for(i in 1:nrow(Bact.Sub)){
+  if(i == 1){
+    n_KEGG <- length(unlist(strsplit(Bact.Sub$KEGG_ko[i],",")))
+  }
+  m_KEGG <- length(unlist(strsplit(Bact.Sub$KEGG_ko[i],",")))
+  
+  if(m_KEGG > n_KEGG){
+    n_KEGG <- m_KEGG
+  }
+}
+
+KEGG_columns <- paste("KEGG",1:n_KEGG,sep = "")
+
+Bact.Sub <- separate(Bact.Sub,col = KEGG_ko,into = KEGG_columns,
+                      sep = ",", remove = FALSE, fill = "right", extra = "drop")
+
+ko_list <- unique(unlist(c(Bact.Sub[,grepl(pattern = "KEGG",names(Bact.Sub))][,-1])))
+ko_list[is.na(ko_list)] <- "Unclassified"
+ko_list[ko_list == "-"] <- "Unclassified"
+
+source("pathway_API.R")
+
+kegg_API <- function(kegg,First_path = TRUE){
+  pathway <- system(paste0("curl https://rest.kegg.jp/link/pathway/", kegg), intern=TRUE)
+  path_idx <- grep(paste0(kegg,"\tpath:ko"),pathway)
+
+  ifelse(isEmpty(path_idx),
+         "-",
+         stri_sub(pathway[ifelse(First_path,min(path_idx),max(path_idx))], 16))
+}
+
+for(i in 1:length(ko_list)){
+  if(i == 1){
+    paths <- matrix(NA,nrow = length(ko_list),ncol = 2)
+    colnames(paths) <- c("Path","K_number")
+    start_time <- Sys.time()
+  }
+  vec <- ko_list[i]
+  
+  paths[i,1] <- ifelse(vec != "Unclassified",kegg_API(vec,F),"Unclassified")
+  paths[i,2] <- vec
+  
+  if(i%%100 == 0){
+    
+    time_passed <- difftime(Sys.time(),start_time,units = "mins")
+    if(time_passed < 60){
+      print(paste("ko",i,"in the list.",round(time_passed,2),"minutes has passed"))
+    } else {
+      print(paste("ko",i,"in the list.",round(time_passed/60,2),"hours has passed"))
+    }
+  }
+}
+
+
+
+```
 
 
 
