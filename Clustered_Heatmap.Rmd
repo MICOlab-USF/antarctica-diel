@@ -783,39 +783,122 @@ kegg_API <- function(kegg,First_path = TRUE){
          stri_sub(pathway[ifelse(First_path,min(path_idx),max(path_idx))], 16))
 }
 
-for(i in 1:length(ko_list)){
-  if(i == 1){
-    paths <- matrix(NA,nrow = length(ko_list),ncol = 2)
-    colnames(paths) <- c("Path","K_number")
-    start_time <- Sys.time()
-  }
-  vec <- ko_list[i]
-  
-  paths[i,1] <- ifelse(vec != "Unclassified",kegg_API(vec,F),"Unclassified")
-  paths[i,2] <- vec
-  
-  if(i%%100 == 0){
-    
-    time_passed <- difftime(Sys.time(),start_time,units = "mins")
-    if(time_passed < 60){
-      print(paste("ko",i,"in the list.",round(time_passed,2),"minutes has passed"))
-    } else {
-      print(paste("ko",i,"in the list.",round(time_passed/60,2),"hours has passed"))
-    }
-  }
-}
+# for(i in 1:length(ko_list)){
+#   if(i == 1){
+#     paths <- matrix(NA,nrow = length(ko_list),ncol = 2)
+#     colnames(paths) <- c("Path","K_number")
+#     start_time <- Sys.time()
+#   }
+#   vec <- ko_list[i]
+#   
+#   paths[i,1] <- ifelse(vec != "Unclassified",kegg_API(vec,F),"Unclassified")
+#   paths[i,2] <- vec
+#   
+#   if(i%%100 == 0){
+#     
+#     time_passed <- difftime(Sys.time(),start_time,units = "mins")
+#     if(time_passed < 60){
+#       print(paste("ko",i,"in the list.",round(time_passed,2),"minutes has passed"))
+#     } else {
+#       print(paste("ko",i,"in the list.",round(time_passed/60,2),"hours has passed"))
+#     }
+#   }
+# }
 
 
 
 ```
 
 
+```{r}
+# Setting up and splitting kegg columns ####
+
+for(i in 1:nrow(Bact.Sub)){
+  if(i == 1){
+    n_KEGG <- length(unlist(strsplit(Bact.Sub$KEGG_ko[i],",")))
+  }
+  m_KEGG <- length(unlist(strsplit(Bact.Sub$KEGG_ko[i],",")))
+  
+  if(m_KEGG > n_KEGG){
+    n_KEGG <- m_KEGG
+  }
+}
+
+KEGG_columns <- paste("KEGG",1:n_KEGG,sep = "")
+
+Bact.Sub <- separate(Bact.Sub,col = KEGG_ko,into = KEGG_columns,
+                      sep = ",", remove = FALSE, fill = "right", extra = "drop")
+
+load("KO_paths_Bact.RData")
+
+Bact.Sub$K1_path <- unlist(lapply(Bact.Sub$KEGG1,function(x){ifelse(x != "-",paths[paths[,2] == x,1],"-")}))
+```
+
+
+```{r}
+Bact.Sub$KEGG1[Bact.Sub$KEGG1 == "-"] <- "Unclassified"
+
+kegg.vec <- unique(Bact.Sub$KEGG1)
+n <- length(kegg.vec)
+
+sample.vec <- paste0(meta.data$SampleID,"_quant")
+m <- length(sample.vec)
+
+for(i in 1:n){
+  filter <- Bact.Sub$KEGG1 == kegg.vec[i]
+  
+  df.temp <- Bact.Sub[filter,]
+  
+  for(j in 1:m){
+    if(i == 1 & j == 1){
+      df.count <- matrix(NA,nrow = n,ncol = m)
+      colnames(df.count) <- meta.data$SampleName
+      rownames(df.count) <- kegg.vec
+    }
+    
+    vec <- sum(df.temp[,names(df.temp) == sample.vec[j]])
+    
+    df.count[i,j] <- ifelse(vec != 0,log(vec),-7.5)
+    
+  }
+}
 
 
 
+Count_cols <- list("Day" = c("Day1" = "darkgreen",
+                             "Day2" = "blueviolet"),
+                   "Time.Of.Day" = c("afternoon" = "#F7F4B7",
+                                     "night" = "darkblue",
+                                     "morning" = "#B7E1DD",
+                                     "evening" = "orange"))
 
 
+paths <- paths[-3,]
 
+paths_df <- data.frame(paths[paths[,2] %in% kegg.vec,1])
+rownames(paths_df) <- paths[paths[,2] %in% kegg.vec,2]
+
+MetaData_df <- data.frame(meta.data[,c(4,5)])
+names(MetaData_df) <- c("Day","Time.Of.Day")
+rownames(MetaData_df) <- meta.data$SampleName
+
+heat_plot <- pheatmap((df.count),
+             col = brewer.pal(10, 'RdYlGn'),
+             cluster_rows = T, cluster_cols = T, # set to FALSE if you want to remove the dendograms
+             clustering_distance_cols = 'euclidean',
+             clustering_distance_rows = 'euclidean',
+             clustering_method = 'ward.D',
+             annotation_row = paths_df,
+             annotation_names_row = F,
+             annotation_col = MetaData_df,
+             annotation_names_col = T,
+             annotation_colors = Count_cols,
+             show_rownames = F, show_colnames = F,
+                          fontsize_row = 7,
+                          fontsize_col = 5,
+             )
+
+```
 
 
 
