@@ -71,6 +71,10 @@ Euk.Sub <- separate(Euk.Sub,col = KEGG_ko,into = KEGG_columns,
 
 Euk_KO_paths <- read.csv("KO_pathway_Euk.csv")
 
+vec <- unlist(lapply(Euk.Sub$KEGG1,function(x){ifelse(x == "-","",Euk_KO_paths$ko[Euk_KO_paths$K1 == x])}))
+
+vec[vec == ""] <- "Unclassified"
+
 for(i in 1:nrow(Euk.Sub)){
   if(i == 1){
     Ko_path <- rep(NA,nrow(Euk.Sub))
@@ -898,10 +902,86 @@ heat_plot <- pheatmap((df.count),
                           fontsize_col = 5,
              )
 
+name_vec <- paste0("Heatmaps/","Bact_all_keggs.pdf")
+
+pdf(name_vec, height = 10, width = 8)
+heat_plot
+dev.off()
+
 ```
 
 
+```{r}
+#Euk.Sub$KEGG1[Euk.Sub$KEGG1 == "-"] <- "Unclassified"
 
+kegg.vec <- unique(Euk.Sub$KEGG1)
+n <- length(kegg.vec)
+
+sample.vec <- paste0(meta.data$SampleID,"_quant")
+m <- length(sample.vec)
+
+for(i in 1:n){
+  filter <- Euk.Sub$KEGG1 == kegg.vec[i]
+  
+  df.temp <- Euk.Sub[filter,]
+  
+  for(j in 1:m){
+    if(i == 1 & j == 1){
+      df.count <- matrix(NA,nrow = n,ncol = m)
+      colnames(df.count) <- meta.data$SampleName
+      rownames(df.count) <- kegg.vec
+    }
+    
+    vec <- sum(df.temp[,names(df.temp) == sample.vec[j]])
+    
+    df.count[i,j] <- ifelse(vec != 0,log(vec),-7.25)
+    
+  }
+}
+
+
+
+Count_cols <- list("Day" = c("Day1" = "darkgreen",
+                             "Day2" = "blueviolet"),
+                   "Time.Of.Day" = c("afternoon" = "#F7F4B7",
+                                     "night" = "darkblue",
+                                     "morning" = "#B7E1DD",
+                                     "evening" = "orange"))
+
+
+paths_df <- rbind(Euk_KO_paths[Euk_KO_paths$K1 %in% kegg.vec,],c("-",""))
+rowname_vec <- paths_df$K1
+
+paths_df <- data.frame(paths_df[,2])
+rownames(paths_df) <- rowname_vec
+
+MetaData_df <- data.frame(meta.data[,c(4,5)])
+names(MetaData_df) <- c("Day","Time.Of.Day")
+rownames(MetaData_df) <- meta.data$SampleName
+
+heat_plot <- pheatmap((df.count),
+             col = brewer.pal(10, 'RdYlGn'),
+             cluster_rows = T, cluster_cols = T, # set to FALSE if you want to remove the dendograms
+             clustering_distance_cols = 'euclidean',
+             clustering_distance_rows = 'euclidean',
+             clustering_method = 'ward.D',
+             annotation_row = paths_df,
+             annotation_names_row = F,
+             annotation_col = MetaData_df,
+             annotation_names_col = T,
+             annotation_colors = Count_cols,
+             show_rownames = F, show_colnames = F,
+                          fontsize_row = 7,
+                          fontsize_col = 5,
+             )
+
+name_vec <- paste0("Heatmaps/","Euk_all_keggs.pdf")
+
+pdf(name_vec, height = 10, width = 8)
+heat_plot
+dev.off()
+
+```
 
 
 
