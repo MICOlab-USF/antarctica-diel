@@ -442,8 +442,8 @@ heat_plot <- pheatmap((df.count),
 
 
 # name_vec <- paste0("Heatmaps/","Top4Class_Top10Paths.pdf")
-# 
 # pdf(name_vec, height = 10, width = 8)
+
 # heat_plot
 # dev.off()
 ```
@@ -452,8 +452,12 @@ heat_plot <- pheatmap((df.count),
 Class_of_interest <- c("Bacillariophyta","Dinophyceae","Prymnesiophyceae","Cryptophyceae")
 
 df.merged <- Euk.Sub[Euk.Sub$Class %in% Class_of_interest,]
-df.merged$KEGG1[is.na(df.merged$KEGG1)] <- "Unclassified"
+# df.merged$KEGG1[is.na(df.merged$KEGG1)] <- "Unclassified"
 
+df.merged <- df.merged[df.merged$K1_path != "Unclassified",]
+df.merged <- df.merged[df.merged$KEGG1 != "-",]
+
+n_keggs <- 5
 
 for(i in 1:length(Class_of_interest)){
   
@@ -489,10 +493,10 @@ for(i in 1:length(Class_of_interest)){
           
           if(l == length(ko.vec)){
             
-            if(length(ko.vec) < 5){
+            if(length(ko.vec) < n_keggs){
               top5_ko <- ko.vec[order(vec2,decreasing = TRUE)]
             }else{
-              top5_ko <- ko.vec[order(vec2,decreasing = TRUE)[1:5]]
+              top5_ko <- ko.vec[order(vec2,decreasing = TRUE)[1:n_keggs]]
             }
             
           }
@@ -561,7 +565,8 @@ for(i in 1:n){
       colnames(df.count) <- meta.data$SampleName
     }
     
-    df.count[i,j] <- log(sum(df.Temp[,names(df.Temp) == sample_vec[j]]))
+    # df.count[i,j] <- log(sum(df.Temp[,names(df.Temp) == sample_vec[j]]))
+    df.count[i,j] <- sum(df.Temp[,names(df.Temp) == sample_vec[j]])
   }
 }
 
@@ -594,7 +599,7 @@ MetaData_df <- data.frame(meta.data[,c(4,5)])
 names(MetaData_df) <- c("Day","Time.Of.Day")
 rownames(MetaData_df) <- meta.data$SampleName
 
-heat_plot <- pheatmap((t(df.count)),
+heat_plot <- pheatmap(cor(t(df.count)),
              col = brewer.pal(10, 'RdYlGn'),
              cluster_rows = T, cluster_cols = T, # set to FALSE if you want to remove the dendograms
              clustering_distance_cols = 'euclidean',
@@ -602,20 +607,26 @@ heat_plot <- pheatmap((t(df.count)),
              clustering_method = 'ward.D',
              annotation_col = Class_df,
              annotation_names_row = T,
-             annotation_row = MetaData_df,
+             annotation_row = Class_df,
              annotation_names_col = T,
+             # annotation_row = MetaData_df,
+             # annotation_names_col = T,
              annotation_colors = Count_cols,
              show_rownames = F, show_colnames = F,
                           fontsize_row = 7,
                           fontsize_col = 5,
+             cutree_rows = 4,cutree_cols = 4
              )
 
 
 # name_vec <- paste0("Heatmaps/","Top4Class_Top5KO_top10Paths.pdf")
-# 
 # pdf(name_vec, height = 8, width = 12)
-# heat_plot
-# dev.off()
+
+name_vec <- paste0("Heatmaps/","Cor_Top4Class_Top5KO_top10Paths.pdf")
+pdf(name_vec, height = 12, width = 12)
+
+heat_plot
+dev.off()
 ```
 
 ```{r}
@@ -840,7 +851,8 @@ Bact.Sub$K1_path <- unlist(lapply(Bact.Sub$KEGG1,function(x){ifelse(x != "-",pat
 
 
 ```{r}
-Bact.Sub$KEGG1[Bact.Sub$KEGG1 == "-"] <- "Unclassified"
+# Bact.Sub$KEGG1[Bact.Sub$KEGG1 == "-"] <- "Unclassified"
+Bact.Sub <- Bact.Sub[Bact.Sub$KEGG1 != "-",]
 
 kegg.vec <- unique(Bact.Sub$KEGG1)
 n <- length(kegg.vec)
@@ -862,7 +874,8 @@ for(i in 1:n){
     
     vec <- sum(df.temp[,names(df.temp) == sample.vec[j]])
     
-    df.count[i,j] <- ifelse(vec != 0,log(vec),-7.5)
+    # df.count[i,j] <- ifelse(vec != 0,log(vec),-7.5)
+    df.count[i,j] <- vec
     
   }
 }
@@ -886,7 +899,9 @@ MetaData_df <- data.frame(meta.data[,c(4,5)])
 names(MetaData_df) <- c("Day","Time.Of.Day")
 rownames(MetaData_df) <- meta.data$SampleName
 
-heat_plot <- pheatmap((df.count),
+cor_df.count <- cor(t(df.count[1:200,]))
+
+heat_plot <- pheatmap(cor_df.count,
              col = brewer.pal(10, 'RdYlGn'),
              cluster_rows = T, cluster_cols = T, # set to FALSE if you want to remove the dendograms
              clustering_distance_cols = 'euclidean',
@@ -894,19 +909,22 @@ heat_plot <- pheatmap((df.count),
              clustering_method = 'ward.D',
              annotation_row = paths_df,
              annotation_names_row = F,
-             annotation_col = MetaData_df,
+             annotation_col = paths_df,
              annotation_names_col = T,
+             # annotation_col = MetaData_df,
+             # annotation_names_col = T,
              annotation_colors = Count_cols,
              show_rownames = F, show_colnames = F,
                           fontsize_row = 7,
                           fontsize_col = 5,
+             cutree_rows = 4,cutree_cols = 4
              )
 
-name_vec <- paste0("Heatmaps/","Bact_all_keggs.pdf")
-
-pdf(name_vec, height = 10, width = 8)
-heat_plot
-dev.off()
+# name_vec <- paste0("Heatmaps/","Bact_all_keggs.pdf")
+# 
+# pdf(name_vec, height = 10, width = 8)
+# heat_plot
+# dev.off()
 
 ```
 
@@ -983,5 +1001,84 @@ dev.off()
 
 ```
 
+```{r}
+Bact.Sub <- Bact.Sub[Bact.Sub$K1_path != "Unclassified",]
 
+kegg.vec <- unique(Bact.Sub$K1_path)
+n <- length(kegg.vec)
+
+sample.vec <- paste0(meta.data$SampleID,"_quant")
+m <- length(sample.vec)
+
+for(i in 1:n){
+  filter <- Bact.Sub$K1_path == kegg.vec[i]
+  
+  df.temp <- Bact.Sub[filter,]
+  
+  for(j in 1:m){
+    if(i == 1 & j == 1){
+      df.count <- matrix(NA,nrow = n,ncol = m)
+      colnames(df.count) <- meta.data$SampleName
+      rownames(df.count) <- kegg.vec
+    }
+    
+    vec <- sum(df.temp[,names(df.temp) == sample.vec[j]])
+    
+    df.count[i,j] <- vec
+    
+  }
+}
+
+
+
+Count_cols <- list("Day" = c("Day1" = "darkgreen",
+                             "Day2" = "blueviolet"),
+                   "Time.Of.Day" = c("afternoon" = "#F7F4B7",
+                                     "night" = "darkblue",
+                                     "morning" = "#B7E1DD",
+                                     "evening" = "orange"))
+
+
+# paths <- paths[-3,]
+# 
+# paths_df <- data.frame(paths[paths[,2] %in% kegg.vec,1])
+# rownames(paths_df) <- paths[paths[,2] %in% kegg.vec,2]
+
+MetaData_df <- data.frame(meta.data[,c(4,5)])
+names(MetaData_df) <- c("Day","Time.Of.Day")
+rownames(MetaData_df) <- meta.data$SampleName
+
+heat_plot <- pheatmap(cor(t(df.count)),
+             col = brewer.pal(10, 'RdYlGn'),
+             cluster_rows = T, cluster_cols = T, # set to FALSE if you want to remove the dendograms
+             clustering_distance_cols = 'euclidean',
+             clustering_distance_rows = 'euclidean',
+             clustering_method = 'ward.D',
+             # annotation_row = paths_df,
+             # annotation_names_row = F,
+             # annotation_col = MetaData_df,
+             # annotation_names_col = T,
+             annotation_colors = Count_cols,
+             show_rownames = F, show_colnames = F,
+                          fontsize_row = 7,
+                          fontsize_col = 5,
+             )
+
+# name_vec <- paste0("Heatmaps/","Cor_Bact_all_paths.pdf")
+# 
+# pdf(name_vec, height = 10, width = 8)
+# heat_plot
+# dev.off()
+
+```
+
+```{r}
+df.merged <- Bact.Sub
+
+sample.vec <- paste0(meta.data$SampleID,"_quant")
+
+
+
+
+```
 
