@@ -81,7 +81,7 @@ create_plot = function(x_vec,y_vec,lm_vec){
 
 
 ```{r}
-Input_data <- Eukaryota.merged[1:1000,]
+Input_data <- Eukaryota.merged[1:100000,]
 # Input_data <- read.csv("CSV_files/Bacteria.subsection.TPM.csv")
 
 vec_assembly <- unique(meta.data$AssemblyGroup)
@@ -119,12 +119,37 @@ for(i in 1:length(vec_assembly)){
     
     df_means$r.squared <- apply(df_means[,2:9],1,function(row){summary(lm(row~par_vec))$r.squared})
     df_means$n_nonzero <- apply(df_means[,2:9],1,function(row){sum(row > 0)})
+    df_means$p_value <- apply(df_means[,2:9],1,function(row){summary(lm(row~par_vec))$coefficients[2,4]})
+    
+    df_means$KEGG1 <- unlist(lapply(Input_data$KEGG,function(x){unlist(strsplit(x,","))[1]}))
     
     seq_df <- df_means[df_means$r.squared >.95 & df_means$n_nonzero > 2,]
     
     print(Sys.time() - time1)
   }
 }
+```
+```{r}
+kegg_API <- function(kegg,First_path = TRUE){
+  pathway <- system(paste0("curl https://rest.kegg.jp/link/pathway/", kegg), intern=TRUE)
+  path_idx <- grep(paste0(kegg,"\tpath:ko"),pathway)
+
+  ifelse(isEmpty(path_idx),
+         "-",
+         stri_sub(pathway[ifelse(First_path,min(path_idx),max(path_idx))], 16))
+}
+
+seq_df$K1_path <- laply(seq_df$KEGG1,function(x){ifelse(x != "-",kegg_API(x,F),"-")})
+
+par_paths <- unique(seq_df$K1_path[seq_df$K1_path != "-"])
+
+save(par_paths,file = "par_paths.RData")
+```
+
+```{r}
+df_means$fold_change <- log(df_means$Day1_afternoon+0.0001 / (df_means$Day2_evening+0.0001),2)
+
+plot(df_means$fold_change,-log(df_means$p_value,10))
 ```
 
 
