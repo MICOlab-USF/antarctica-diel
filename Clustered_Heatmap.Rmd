@@ -170,9 +170,9 @@ for(i in 1:n){ #Looping through the paths to count the occurrences.
     
    if(i == 1 & j == 1){ #Sets up an empty data.frame to input the data
      
-     df.count <- data.frame(matrix(ncol = m, nrow = n))
-     colnames(df.count) <- Euk.Families
-     rownames(df.count) <- kegg.paths2 #unlist(lapply(kegg.paths,function(x){if(x != "Unclassified"){pathway_API(x)$name}else{"Unclassified"}}))
+     # df.count <- data.frame(matrix(ncol = m, nrow = n))
+     # colnames(df.count) <- Euk.Families
+     # rownames(df.count) <- kegg.paths2 #unlist(lapply(kegg.paths,function(x){if(x != "Unclassified"){pathway_API(x)$name}else{"Unclassified"}}))
      
      df.count2 <- data.frame(matrix(ncol = m, nrow = n))
      colnames(df.count2) <- Euk.Families
@@ -227,6 +227,21 @@ pheatmap(data,
 
 ```
 
+```{r}
+Euk.Sub <- Euk.Sub[!is.na(Euk.Sub$Family),]
+
+Euk.Families <- unique(Euk.Sub$Family)
+
+vec1 <- rep(NA,length(Euk.Families))
+vec2 <- rep(NA,length(Euk.Families))
+
+for(i in 1:length(Euk.Families)){
+  vec1[i] <- mean(apply(Euk.Sub[Euk.Sub$Family == Euk.Families[i],2:25],2,sum))
+  vec2[i] <- Euk.Families[i]
+}
+
+dfOut <- cbind.data.frame(vec1,vec2)
+```
 
 
 ```{r test}
@@ -252,17 +267,17 @@ df.merged <- df.merged[!is.na(df.merged$Family),]
 kegg.paths <- unique(df.merged$K1_path)
 Euk.Families <- unique(df.merged$Family)
 
-# n <- length(Euk.Families)
-n <- length(kegg.paths)
+n <- length(Euk.Families)
+# n <- length(kegg.paths)
 m <- length(AssemblyGroups)
 
 #------------------------------------------------------------------------------
 for(i in 1:n){ #Looping through the paths to count the occurrences.
   
-  # Family.filter <- df.merged$Family == Euk.Families[i]
-  # df.temp <- df.merged[Family.filter,]
-  kegg.filter <- df.merged$K1_path == kegg.paths[i]
-  df.temp <- df.merged[kegg.filter,]
+  Family.filter <- df.merged$Family == Euk.Families[i]
+  df.temp <- df.merged[Family.filter,]
+  # kegg.filter <- df.merged$K1_path == kegg.paths[i]
+  # df.temp <- df.merged[kegg.filter,]
   
   for(j in 1:m){ #Looping through the sampling time points.
     
@@ -270,8 +285,8 @@ for(i in 1:n){ #Looping through the paths to count the occurrences.
      
      df.count <- data.frame(matrix(ncol = m, nrow = n))
      colnames(df.count) <- AssemblyGroups
-     # rownames(df.count) <- Euk.Families
-     rownames(df.count) <- kegg.paths2
+     rownames(df.count) <- Euk.Families
+     # rownames(df.count) <- kegg.paths
      
      
    }
@@ -280,13 +295,13 @@ for(i in 1:n){ #Looping through the paths to count the occurrences.
     
     vec <- sum(df.temp[,Day.filter])
     
-    df.count[i,j] <- ifelse(vec != 0,log(vec),-6)
+    df.count[i,j] <- log(vec+1)
     # df.count[i,j] <- sum(df.temp[,day.vec[j]])
     
   }
 }
 
-vec_rows <- order(apply(df.count,1,mean),decreasing = TRUE)[1:20]
+vec_rows <- order(apply(df.count,1,mean),decreasing = TRUE)
 # vec_cols <- order(apply(df.count2,2,mean),decreasing = TRUE)
 
 heat_plot <- pheatmap((df.count[vec_rows,]),
@@ -392,7 +407,9 @@ for(i in 1:n){
       colnames(df.count) <- meta.data$SampleName
     }
     
-    df.count[i,j] <- log(sum(df.Temp[,names(df.Temp) == sample_vec[j]]))
+    vec <- sum(df.Temp[,names(df.Temp) == sample_vec[j]])
+    
+    df.count[i,j] <- log(vec+1)
   }
 }
 
@@ -565,8 +582,10 @@ for(i in 1:n){
       colnames(df.count) <- meta.data$SampleName
     }
     
-    # df.count[i,j] <- log(sum(df.Temp[,names(df.Temp) == sample_vec[j]]))
-    df.count[i,j] <- sum(df.Temp[,names(df.Temp) == sample_vec[j]])
+    vec <- df.Temp[,names(df.Temp) == sample_vec[j]]
+    
+    # df.count[i,j] <- log(vec)
+    df.count[i,j] <- vec
   }
 }
 
@@ -648,7 +667,7 @@ names(par_paths) <- c("Pathway","name")
 
 # Start Counting
 
-n <- length(par_paths)
+n <- nrow(par_paths)
 sample_vec <- paste0(meta.data$SampleID,"_quant")
 
 m <- length(sample_vec)
@@ -668,33 +687,23 @@ for(i in 1:n){
     
     vec <- sum(df.Temp[,names(df.Temp) == sample_vec[j]])
     
-    df.count[i,j] <- ifelse(vec != 0, log(vec),-5.2)
+    df.count[i,j] <- log(vec+1)
   }
 }
 
 # Heatmap ---------------------------------------------------------------------
 
-Pathway_cols <- c("#1B9E77","#D95F02","#7570B3","#E7298A",
-                  "#66A61E","#E6AB02","#A6761D","#7FC97F",
-                  "#BEAED4","#FDC086","#FFFF99","#386CB0",
-                  "#F0027F","#BF5B17","black")
-names(Pathway_cols) <- paths
 
-Class_cols <- c('#f0b08f','#60555f','#9fd6e6','#63a375',"orange","black")
-names(Class_cols) <- Class_of_interest
 
-Count_cols <- list(#"Pathway" = Pathway_cols,
-                   #"Class" = Class_cols,
-                   "Day" = c("Day1" = "darkgreen",
+
+Count_cols <- list("Day" = c("Day1" = "darkgreen",
                              "Day2" = "blueviolet"),
                    "Time.Of.Day" = c("afternoon" = "#F7F4B7",
                                      "night" = "darkblue",
                                      "morning" = "#B7E1DD",
                                      "evening" = "orange"))
 
-Class_df <- data.frame(df_genes[,c(4,2)])
-names(Class_df) <- c("Pathway","Class")
-rownames(Class_df) <- df_genes[,3]
+
 
 MetaData_df <- data.frame(meta.data[,c(4,5)])
 names(MetaData_df) <- c("Day","Time.Of.Day")
@@ -887,6 +896,8 @@ heat_plot <- pheatmap(cor_df.count,
 ```{r}
 #Euk.Sub$KEGG1[Euk.Sub$KEGG1 == "-"] <- "Unclassified"
 
+Euk.Sub <- Euk.Sub[!(Euk.Sub$KEGG1 == "-"),]
+
 kegg.vec <- unique(Euk.Sub$KEGG1)
 n <- length(kegg.vec)
 
@@ -907,7 +918,7 @@ for(i in 1:n){
     
     vec <- sum(df.temp[,names(df.temp) == sample.vec[j]])
     
-    df.count[i,j] <- ifelse(vec != 0,log(vec),-7.25)
+    df.count[i,j] <- log(vec+1)
     
   }
 }
@@ -922,7 +933,7 @@ Count_cols <- list("Day" = c("Day1" = "darkgreen",
                                      "evening" = "orange"))
 
 
-paths_df <- rbind(Euk_KO_paths[Euk_KO_paths$K1 %in% kegg.vec,],c("-",""))
+paths_df <- rbind(Euk_KO_paths[Euk_KO_paths$K1 %in% kegg.vec,])
 rowname_vec <- paths_df$K1
 
 paths_df <- data.frame(paths_df[,2])
@@ -1028,23 +1039,23 @@ heat_plot <- pheatmap(cor(t(df.count)),
 ```
 
 ```{r}
-# Order_of_interest <- c("Alteromonadales","Oceanospirillales","Sphingomonadales","Cellvibrionales")
+Order_of_interest <- c("Alteromonadales","Oceanospirillales","Sphingomonadales","Cellvibrionales")
 # Genus_of_interest <- c("Paraglaciecola","Colwellia")
 
-Order_of_interest <- c("Gammaproteobacteria","Alphaproteobacteria","Flavobacteriia","Actinobacteria (Class)","Oscillatoriophycideae",
-                       "Zetaproteobacteria","Deltaproteobacteria","Clostridia","Betaproteobacteria","Bacteroidia",
-                       "Cytophagia","Opitutae","Sphingobacteriia","Epsilonproteobacteria","Chlorobia",
-                       "Deinococci","Bacilli","Cyanophyceae","Spirochaetia","Actinobacteria",
-                       "Calditrichae","Bacillales (Class)","Deferribacteres (Class)","Aquificae (Class)","Thermotogae (Class)",
-                       "Fusobacteriia","Thermodesulfobacteria (Class)","Aquificae","Anaerolineae","Nitriliruptoria",
-                       "Phycisphaerae","Mollicutes","Oligoflexia","Erysipelotrichia","Rubrobacteria",
-                       "Synergistia"   )
+# Order_of_interest <- c("Gammaproteobacteria","Alphaproteobacteria","Flavobacteriia","Actinobacteria (Class)","Oscillatoriophycideae",
+#                        "Zetaproteobacteria","Deltaproteobacteria","Clostridia","Betaproteobacteria","Bacteroidia",
+#                        "Cytophagia","Opitutae","Sphingobacteriia","Epsilonproteobacteria","Chlorobia",
+#                        "Deinococci","Bacilli","Cyanophyceae","Spirochaetia","Actinobacteria",
+#                        "Calditrichae","Bacillales (Class)","Deferribacteres (Class)","Aquificae (Class)","Thermotogae (Class)",
+#                        "Fusobacteriia","Thermodesulfobacteria (Class)","Aquificae","Anaerolineae","Nitriliruptoria",
+#                        "Phycisphaerae","Mollicutes","Oligoflexia","Erysipelotrichia","Rubrobacteria",
+#                        "Synergistia")
 
 df.merged <- Bact.Sub
 
 sample.vec <- paste0(meta.data$SampleID,"_quant")
 
-df.merged <- Bact.Sub[Bact.Sub$Class %in% Order_of_interest,]
+df.merged <- Bact.Sub[Bact.Sub$Order %in% Order_of_interest,]
 # df.merged$KEGG1[is.na(df.merged$KEGG1)] <- "Unclassified"
 
 df.merged <- df.merged[df.merged$K1_path != "-",]
@@ -1054,7 +1065,7 @@ n_keggs <- 5
 
 for(i in 1:length(Order_of_interest)){
   
-  filter <- df.merged$Class %in% Order_of_interest[i]
+  filter <- df.merged$Order %in% Order_of_interest[i]
   
   df.Temp <- df.merged[filter,]
   
@@ -1140,7 +1151,7 @@ names(df_genes) <- c("ko","Pathway","Order","Identifier","Path")
 
 # Start Counting
 
-filter <- paste(df.merged$KEGG1,df.merged$Class,sep = "_") %in% df_genes[,4]
+filter <- paste(df.merged$KEGG1,df.merged$Order,sep = "_") %in% df_genes[,4]
 
 df.merged <- df.merged[filter,]
 
@@ -1150,7 +1161,7 @@ sample_vec <- paste0(meta.data$SampleID,"_quant")
 m <- length(sample_vec)
 
 for(i in 1:n){
-  filter <- paste(df.merged$KEGG1,df.merged$Class,sep = "_") == df_genes[i,4]
+  filter <- paste(df.merged$KEGG1,df.merged$Order,sep = "_") == df_genes[i,4]
   
   df.Temp <- df.merged[filter,]
   
@@ -1164,7 +1175,7 @@ for(i in 1:n){
     
     vec <- sum(df.Temp[,names(df.Temp) == sample_vec[j]])
     
-    df.count[i,j] <- ifelse(vec != 0, log(vec),-8)
+    df.count[i,j] <- log(vec+.01)
     # df.count[i,j] <- sum(df.Temp[,names(df.Temp) == sample_vec[j]])
   }
 }
@@ -1182,8 +1193,8 @@ names(Pathway_cols) <- top10_all
 Order_cols <- c('#f0b08f','#60555f','#9fd6e6','#63a375')
 names(Order_cols) <- Order_of_interest
 
-Count_cols <- list(#"Pathway" = Pathway_cols,
-                   #"Order" = Order_cols,
+Count_cols <- list("Pathway" = Pathway_cols,
+                   "Order" = Order_cols,
                    "Day" = c("Day1" = "darkgreen",
                              "Day2" = "blueviolet"),
                    "Time.Of.Day" = c("afternoon" = "#F7F4B7",
@@ -1229,6 +1240,8 @@ heat_plot
 dev.off()
 
 ```
+
+
 ```{r}
 cor_df <- cor(t(df.count),t(df.count2))
 
