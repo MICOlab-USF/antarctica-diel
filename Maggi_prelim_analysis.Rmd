@@ -77,6 +77,8 @@ exp_int <-data.frame(exp_int)
 dds<- DESeqDataSetFromMatrix(countData = exp_int,
                               colData = meta4deseq,
                               design = ~ Time)
+
+
 dds
 ```
 ### variance stabilize

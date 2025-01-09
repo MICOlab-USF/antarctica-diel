@@ -125,8 +125,8 @@ load("CSV_files/Full.merged.RData",verbose = TRUE)
 # Euk.Sub <- Full.merged[Full.merged$Domain == "Eukaryota",]
 # Bact.Sub <- Full.merged[Full.merged$Domain == "Bacteria",]
 # 
-# # save(Bact.Sub,Prok.Sub,Euk.Sub,meta.data,partime,file = "CSV_files/Subsections.RData")
-# # save(Full.merged,meta.data,partime,file = "CSV_files/Full.merged.RData")
+# save(Bact.Sub,Prok.Sub,Euk.Sub,meta.data,partime,file = "CSV_files/Subsections.RData")
+# save(Full.merged,meta.data,partime,file = "CSV_files/Full.merged.RData")
 ```
 
 
