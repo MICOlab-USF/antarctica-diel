@@ -5,7 +5,7 @@ library(ggplot2)
 load("CSV_files/Subsections_numreads.RData",verbose = TRUE)
 load("CSV_files/Subsections.RData",verbose = TRUE)
 
-Input_data <- Euk.Sub
+Input_data <- Bact.Sub
 
 
 for(i in 1:nrow(Input_data)){
@@ -23,6 +23,9 @@ KEGG_columns <- paste("KEGG",1:n_KEGG,sep = "")
 
 Input_data <- separate(Input_data,col = KEGG_ko,into = KEGG_columns,
                      sep = ",", remove = FALSE, fill = "right", extra = "drop")
+
+Input_data <- Input_data[!is.na(Input_data$Class),]
+Input_data$Class_K1 <- paste(Input_data$Class,Input_data$KEGG1,sep = "_")
 
 source("summary_count.R")
 
@@ -95,7 +98,7 @@ GroupOI <- c("morning","afternoon","evening","night")
 
 dds <- DESeqDataSetFromMatrix(countData=countData[,c("SequenceID",df_meta$SampleID[df_meta$ToD %in% GroupOI])],
                               colData=df_meta[df_meta$ToD %in% GroupOI,], 
-                              design=~Day.num, tidy = TRUE)
+                              design=~ToD, tidy = TRUE)
 
 dds
 
@@ -121,7 +124,7 @@ head(res)
 par(mfrow=c(2,3))
 
 for(i in 1:6){
-  plotCounts(dds, gene=row.names(res)[i], intgroup="Day.num")
+  plotCounts(dds, gene=row.names(res)[i], intgroup="ToD")
 }
 
 # Volcano Plot ----------------------------------------------------------------
@@ -130,7 +133,7 @@ pAdj_thresh <- 0.05
 #reset par
 par(mfrow=c(1,1))
 # Make a basic volcano plot
-with(res, plot(log2FoldChange, -log10(pvalue), pch=20, main="Volcano plot", xlim=c(-3,3)))
+with(res, plot(log2FoldChange, -log10(pvalue), pch=20, main="Volcano plot"))
 
 # Add colored points: blue if padj<0.01, red if log2FC>1 and padj<0.05)
 with(subset(res,

@@ -411,6 +411,49 @@ p1 <- ggplot(dfOut2)+
 #                 alpha = 0.5))+
 #   scale_y_continuous(sec.axis = sec_axis(~.*scale, name = "Secondary Y-axis"))
 
+# vec <- c("Day1_morning",
+#          "Day1_afternoon",
+#          "Day1_evening",
+#          "Day1_night",
+#          "Day2_morning",
+#          "Day2_afternoon",
+#          "Day2_evening",
+#          "Day2_night")
+# 
+# dfOut2$Day_int <- unlist(lapply(dfOut2$Day,function(x){(1:8)[x == vec]}))
+# dfOut2$Day_num <- unlist(lapply(dfOut2$Day,
+#                                  function(x){unlist(strsplit(x,
+#                                                              split = "_",
+#                                                              fixed = TRUE))[1]}))
+# 
+# dfOut2 <- dfOut2[dfOut2$kegg.vec %in% top5.vec[1:5],]
+# 
+# p1 <- ggplot(dfOut2)+
+#   geom_point(aes(color = kegg.vec,
+#     # color = factor(kegg.vec,
+#     #                          levels = c("Unclassified","Other",top5.vec)),
+#                y = Count,
+#                x = Day_int))+
+#   geom_line(aes(color = kegg.vec,
+#     # color = factor(kegg.vec,
+#     #                          levels = c("Unclassified","Other",top5.vec)),
+#                 linetype = Day_num,
+#                y = Count,
+#                x = Day_int))+
+#   scale_x_continuous(breaks = 1:8,
+#                      labels = vec)+
+#   scale_fill_manual(values = c(brewer.pal(12,"Set3"),brewer.pal(8,"Set2"),brewer.pal(9,"Set1")))+
+#   labs(title = "All Bacteria",
+#        y = "Fraction of TPM",
+#        x = "Time of sample",
+#        caption = "This is a caption")+
+#   theme_classic()+
+#   theme(axis.text.x = element_text(angle = 90,
+#                                    vjust = 0.5,
+#                                    hjust=1))+
+#   guides(fill = guide_legend(title = "kegg"),
+#          alpha = "none")
+
 p1
 
 save_name <- "KO_plots/AllBact_topKO.png"

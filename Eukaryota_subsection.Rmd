@@ -111,22 +111,22 @@ The code also removes the .pxx from the Sequence ID.
 ```{r}
 #Subsectioning the Eukaryota data from the Taxonomic and Functional Annotations file####
 
-# #Loading the raw file
-# tax.func <- read.csv("CSV_files/TaxonomicAndFunctionalAnnotations.csv", sep = "\t")
-# 
-# #Splitting the column with full_classification into seperate columns
-# tax.func <- separate(tax.func,col = full_classification,into = c("Domain","Supergroup","Division","Class","Order","Family","Genus","Species"), sep = "; ", remove = FALSE, fill = "right", extra = "drop")
-# 
-# #Cleaning up data by removing blank spaces at the beginning of entries in the Domain column.
-# tax.func$Domain <- ifelse(substring(tax.func$Domain,1,1) == " ", substring(tax.func$Domain,2), tax.func$Domain)
-# 
-# #Filtering out all the rows with Bacteria data, leaving only Eukaryote data
-# Eukaryota <- tax.func[tax.func$Domain == "Eukaryota",]
-# 
-# #Removing the .p after sequence names, in order to remove duplicate sequences later.
-# Eukaryota$SequenceID <- unlist(lapply(Eukaryota$SequenceID,function(x){unlist(strsplit(x,split = ".",fixed = TRUE))[1]}))
-# 
-# write.csv(Eukaryota,"CSV_files/Eukaryota.subsection.TFA.csv", row.names = F)
+#Loading the raw file
+tax.func <- read.csv("CSV_files/TaxonomicAndFunctionalAnnotations.csv", sep = "\t")
+
+#Splitting the column with full_classification into seperate columns
+tax.func <- separate(tax.func,col = full_classification,into = c("Domain","Supergroup","Division","Class","Order","Family","Genus","Species"), sep = "; ", remove = FALSE, fill = "right", extra = "drop")
+
+#Cleaning up data by removing blank spaces at the beginning of entries in the Domain column.
+tax.func$Domain <- ifelse(substring(tax.func$Domain,1,1) == " ", substring(tax.func$Domain,2), tax.func$Domain)
+
+#Filtering out all the rows with Bacteria data, leaving only Eukaryote data
+Eukaryota <- tax.func[tax.func$Domain == "Eukaryota",]
+
+#Removing the .p after sequence names, in order to remove duplicate sequences later.
+Eukaryota$SequenceID <- unlist(lapply(Eukaryota$SequenceID,function(x){unlist(strsplit(x,split = ".",fixed = TRUE))[1]}))
+
+write.csv(Eukaryota,"CSV_files/Eukaryota.subsection.TFA.csv", row.names = F)
 ```
 
 The third code chunk filters the numread and TPM datasets to only include sequences that appear in the TaxonomicAndFunctionalAnnotations.csv file. This requires the files: 'Eukaryota.subsection.TFA.csv' (which is created in the code-chunk above), 'Eukaryota.subsection.numreads.csv' and 'salmon.merged.TPM.subset5.csv' to be present in the CSV_files folder.
@@ -134,19 +134,19 @@ The third code chunk filters the numread and TPM datasets to only include sequen
 ```{r}
 #Using the sequence ID's from the Eukaryota subsection to subsection the numreads and the TPM files####
 
-# Eukaryota <- read.csv("CSV_files/Eukaryota.subsection.TFA.csv")
-# 
-# salmon.numread <- read.csv("CSV_files/salmon.merged.numreads.subset5.csv")
-# filter <- salmon.numread$Name %in% Eukaryota$SequenceID
-# 
-# Eukaryota.numread <- salmon.numread[filter,]
-# write.csv(Eukaryota.numread,"CSV_files/Eukaryota.subsection.numreads.csv",row.names = F)
-# 
-# salmon.TPM <- read.csv("CSV_files/salmon.merged.TPM.subset5.csv")
-# filter <- salmon.TPM$Name %in% Eukaryota$SequenceID
-# 
-# Eukaryota.TPM <- salmon.TPM[filter,]
-# write.csv(Eukaryota.TPM, "CSV_files/Eukaryota.subsection.TPM.csv",row.names = F)
+Eukaryota <- read.csv("CSV_files/Eukaryota.subsection.TFA.csv")
+
+salmon.numread <- read.csv("CSV_files/salmon.merged.numreads.subset5.csv")
+filter <- salmon.numread$Name %in% Eukaryota$SequenceID
+
+Eukaryota.numread <- salmon.numread[filter,]
+write.csv(Eukaryota.numread,"CSV_files/Eukaryota.subsection.numreads.csv",row.names = F)
+
+salmon.TPM <- read.csv("CSV_files/salmon.merged.TPM.subset5.csv")
+filter <- salmon.TPM$Name %in% Eukaryota$SequenceID
+
+Eukaryota.TPM <- salmon.TPM[filter,]
+write.csv(Eukaryota.TPM, "CSV_files/Eukaryota.subsection.TPM.csv",row.names = F)
 ```
 
 The following code filters duplicate sequence IDs, multiple rows had the same sequence ID after the .pxx extension was removed. There is an emphasis on retaining as much data as possible, so the sequences are first filtered to include as many rows containing KEGG annotaions, and secondly rows are kept that contain COG annotations.
