@@ -1,0 +1,237 @@
+---
+title: "Differential expression analysis"
+author: "Andreas Norlin"
+date: "2025-01-14"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+rm(list = ls())
+
+package.list <- c("dplyr","tidyverse","ggplot2",
+                  "lemon","vegan","Rmisc",
+                  "lubridate","patchwork","stringi",
+                  "RColorBrewer")
+
+if(!all(package.list %in% installed.packages()[,"Package"])){
+  install.packages(package.list[!(package.list %in% installed.packages()[,"Package"])])
+}
+
+bioc.packages <- c("phyloseq","DESeq2")
+
+if(!all(bioc.packages %in% installed.packages()[,"Package"])){
+  if (!require("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+
+BiocManager::install(bioc.packages[!(bioc.packages %in% installed.packages()[,"Package"])])
+}
+
+library(dplyr)
+library(tidyverse)
+library(ggplot2)
+library(lemon)
+library(vegan)
+library(Rmisc)
+library(lubridate)
+library(RColorBrewer)
+
+library(phyloseq)
+library(patchwork)
+library(DESeq2)
+library(stringi)
+
+load("CSV_files/Subsections_numreads.RData",verbose = TRUE)
+# load("CSV_files/Subsections.RData",verbose = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r, Data setup}
+
+Input_data <- Bact.Sub
+
+for(i in 1:nrow(Input_data)){
+  if(i == 1){
+    n_KEGG <- length(unlist(strsplit(Input_data$KEGG_ko[i],",",fixed = TRUE)))
+  }
+  m_KEGG <- length(unlist(strsplit(Input_data$KEGG_ko[i],",",fixed = TRUE)))
+  
+  if(m_KEGG > n_KEGG){
+    n_KEGG <- m_KEGG
+  }
+}
+
+KEGG_columns <- paste("KEGG",1:n_KEGG,sep = "")
+
+Input_data <- separate(Input_data,col = KEGG_ko,into = KEGG_columns,
+                     sep = ",", remove = FALSE, fill = "right", extra = "drop")
+
+Input_data <- Input_data[!is.na(Input_data$Class),]
+Input_data$Class_K1 <- paste(Input_data$Class,Input_data$KEGG1,sep = "_")
+
+source("summary_count.R")
+
+day.vec <- paste(meta.data$SampleID,"_quant",sep = "")
+
+df.count <- summary_count(Input_data,Col_vec = day.vec,Col_filter = "KEGG1")
+
+names(df.count) <- unlist(lapply(names(df.count),
+                                 function(x){unlist(strsplit(x,
+                                                             split = "_",
+                                                             fixed = TRUE))[1]}))
+
+df_meta <- meta.data[,c("SampleID","SampleName","AssemblyGroup","Day.num","ToD")] %>%
+  mutate(ToD = factor(ToD,levels = c("morning","afternoon","evening","night")))
+
+
+# Optional extra step to average the replicates of each day ####
+AvgDays <-  FALSE
+
+if(AvgDays == TRUE){
+  # Input_data <- Bact.Sub
+  
+  Input_data <- df.count
+  names(Input_data)[25] <- "SequenceID"
+  
+  # For loop that averages the each assembly group into 8 time points rather that the 8 time points with replicates
+  for(i in 1:24){
+    names(Input_data)[i] <- paste(meta.data$SampleID[meta.data$SampleName == names(Input_data)[i]],"quant",sep = "_")
+  }
+  
+  vec_assembly <- unique(meta.data$AssemblyGroup)
+  
+  for(i in 1:length(vec_assembly)){
+    if(i == 1){
+      names(Input_data) <- unlist(lapply(names(Input_data),
+                                        function(x){unlist(strsplit(x,
+                                                                    split = "_",
+                                                                    fixed = TRUE))[1]}))
+  
+      df_meta <- meta.data[,c("SampleID","SampleName","AssemblyGroup","Day.num","ToD")]
+  
+      df_means <- Input_data$SequenceID
+      par_vec <- NA
+      time1 <- Sys.time()
+    }
+  
+    df_temp <- Input_data[,meta.data$SampleID[meta.data$AssemblyGroup == vec_assembly[i]]]
+  
+    meta_temp <- df_meta %>%
+      distinct(AssemblyGroup,.keep_all = TRUE) %>%
+      filter(AssemblyGroup == vec_assembly[i])
+  
+    vec <- rowMeans(df_temp)
+    # vec <- rowSums(df_temp)
+    df_means <- cbind.data.frame(df_means,vec)
+  
+    names(df_means)[i+1] <- vec_assembly[i]
+  }
+  
+  # creating factors for the ToD in order to analyse the time points chronologically
+  df_meta <- df_meta %>%
+    #distinct(AssemblyGroup,.keep_all = TRUE) %>%
+    mutate(ToD = factor(ToD,levels = c("morning","afternoon","evening","night")))
+}
+
+# Rounding data to become integer ####
+
+df.count <- df.count[apply(df.count, 1, function(x){sum(x == 0)}) < 6,]
+
+countData <- round(df.count)
+countData <- cbind.data.frame("SequenceID" = row.names(df.count),countData)
+
+head(countData)
+tail(countData)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+
+Day_toggle <- "ToD"
+
+GroupOI <- c("morning","afternoon","evening","night")#[c(1,2)]
+
+filter <- c("SequenceID",df_meta$SampleID[df_meta$ToD %in% GroupOI])
+
+if(Day_toggle == "ToD"){
+  dds <- DESeqDataSetFromMatrix(countData=countData[,filter],
+                              colData=df_meta[df_meta$ToD %in% GroupOI,], 
+                              design=~ToD, tidy = TRUE)
+} else if(Day_toggle == "Day.num"){
+  dds <- DESeqDataSetFromMatrix(countData=countData[,filter],
+                              colData=df_meta[df_meta$ToD %in% GroupOI,], 
+                              design=~Day.num, tidy = TRUE)
+}
+
+
+
+dds
+
+# Now we’re ready to run DESEQ function ---------------------------------------
+
+dds <- DESeq(dds)
+
+# Take a look at the results table --------------------------------------------
+
+res <- results(dds)
+
+head(results(dds, tidy = TRUE))
+
+# Summary of differential gene expression -------------------------------------
+
+summary(res) #summary of results
+
+# Sort summary list by p-value ------------------------------------------------
+
+res <- res[order(res$padj,decreasing = F),]
+head(res)
+
+par(mfrow=c(2,3))
+
+for(i in 1:6){
+  plotCounts(dds, gene=row.names(res)[i], intgroup=Day_toggle)`
+}
+```
+
+```{r, Volcano Plot}
+pAdj_thresh <- 0.01
+
+x_range <- min(max(abs(res$log2FoldChange),na.rm = TRUE),150)
+y_range <- min(max(-log10(res$pvalue),na.rm = TRUE),150)
+
+#reset par
+par(mfrow=c(1,1))
+# Make a basic volcano plot
+with(res,
+     plot(log2FoldChange,
+          -log10(pvalue),
+          pch=20,
+          main="Volcano plot",
+          ylim=c(0,y_range),
+          xlim=c(-x_range,x_range)))
+
+# Add colored points: blue if padj<0.01, red if log2FC>1 and padj<0.05)
+with(subset(res,
+            padj<pAdj_thresh ),
+     points(log2FoldChange,-log10(pvalue),
+            pch=20,
+            col="blue"))
+
+with(subset(res,
+            padj<pAdj_thresh & abs(log2FoldChange)>1 & !is.na(padj<pAdj_thresh)),
+     points(log2FoldChange, -log10(pvalue),
+            pch=20,
+            col="red"))
+
+dfOut <- res[res$padj<pAdj_thresh & !is.na(res$padj<pAdj_thresh),]
+```
+

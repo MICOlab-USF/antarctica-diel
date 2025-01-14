@@ -3,7 +3,7 @@ library(tidyverse)
 library(ggplot2)
 
 load("CSV_files/Subsections_numreads.RData",verbose = TRUE)
-load("CSV_files/Subsections.RData",verbose = TRUE)
+# load("CSV_files/Subsections.RData",verbose = TRUE)
 
 Input_data <- Bact.Sub
 
@@ -128,7 +128,7 @@ for(i in 1:6){
 }
 
 # Volcano Plot ----------------------------------------------------------------
-pAdj_thresh <- 0.05
+pAdj_thresh <- 0.01
 
 #reset par
 par(mfrow=c(1,1))
@@ -143,7 +143,7 @@ with(subset(res,
             col="blue"))
 
 with(subset(res,
-            padj<pAdj_thresh & abs(log2FoldChange)>2 & !is.na(padj<pAdj_thresh)),
+            padj<pAdj_thresh & abs(log2FoldChange)>1 & !is.na(padj<pAdj_thresh)),
      points(log2FoldChange, -log10(pvalue),
             pch=19,
             col="red"))
