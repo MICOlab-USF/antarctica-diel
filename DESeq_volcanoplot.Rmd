@@ -42,7 +42,7 @@ library(patchwork)
 library(DESeq2)
 library(stringi)
 
-TPM <- T
+TPM <- FALSE
 
 if(TPM == TRUE){
   load("CSV_files/Subsections.RData",verbose = TRUE)
@@ -60,7 +60,7 @@ When you click the **Knit** button a document will be generated that includes bo
 
 ```{r, Data setup}
 
-Input_data <- Bact.Sub
+Input_data <- Euk.Sub
 
 for(i in 1:nrow(Input_data)){
   if(i == 1){
@@ -103,7 +103,7 @@ df_meta <- meta.data[,c("SampleID","SampleName","AssemblyGroup","Day.num","ToD")
 
 
 # Optional extra step to average the replicates of each day ####
-AvgDays <- FALSE
+AvgDays <- F
 
 if(AvgDays == TRUE){
   # Input_data <- Bact.Sub
@@ -141,12 +141,12 @@ if(AvgDays == TRUE){
 
 # Rounding data to become integer ####
 
-df.0filtered <- df.count[apply(df.count, 1, function(x){sum(x == 0)}) < 1,]
+df.0filtered <- df.count[apply(df.count, 1, function(x){sum(x == 0)}) < 6,]
 
 if(TPM == TRUE){
- countData <- round(df.0filtered*1000,3) 
+ countData <- round(df.0filtered*1000) 
 }else{
-  countData <- round(df.0filtered,3)
+  countData <- round(df.0filtered)
 }
 
 countData <- cbind.data.frame("SequenceID" = row.names(df.0filtered),countData)
@@ -181,8 +181,6 @@ if(Day_toggle == "ToD"){
                               design=~Day.num, tidy = TRUE)
 }
 
-
-
 dds
 
 # Now we’re ready to run DESEQ function ---------------------------------------
@@ -204,6 +202,13 @@ summary(res) #summary of results
 res <- res[order(res$padj,decreasing = F),]
 head(res)
 
+par(mfrow=c(2,3))
+
+for(i in 1:6){
+  plotCounts(dds,
+             gene=row.names(res)[i],
+             intgroup=Day_toggle)
+}
 ```
 
 ```{r, Volcano Plot}
@@ -236,11 +241,10 @@ with(subset(res,
             pch=20,
             col="red"))
 
-
+dfOut <- res[res$padj<pAdj_thresh & !is.na(res$padj<pAdj_thresh),]
 ```
 
 ```{r}
-dfOut <- res[res$padj<pAdj_thresh & !is.na(res$padj<pAdj_thresh),]
 dfOut$ko <- row.names(dfOut)
 
 source("pathway_API.R")
@@ -256,6 +260,7 @@ for(i in 1:nrow(dfOut)){
 }
 
 row.names(dfOut) <- vec
+# dfOut <- dfOut[order(abs(dfOut$log2FoldChange),decreasing = TRUE),]
 
 n <- min(nrow(dfOut),6)
 par(mfrow=c(2,3))
@@ -266,5 +271,92 @@ for(i in 1:n){
              intgroup=Day_toggle,
              main = row.names(dfOut)[i])
 }
+```
+```{r}
+
+if(AvgDays == TRUE){
+  filter <- c("SequenceID",df_meta$AssemblyGroup[df_meta$ToD %in% GroupOI])
+} else {
+  filter <- c("SequenceID",df_meta$SampleID[df_meta$ToD %in% GroupOI]) 
+}
+
+GroupOI <- c("morning","afternoon","evening","night")
+
+pAdj_thresh <- 0.01
+
+for(j in 1:4){
+  testGroup <- GroupOI[j]
+  
+  df_meta$testGroup <- unlist(lapply(df_meta$ToD,function(x){ifelse(x == testGroup,testGroup,"other")}))
+  
+  dds <- DESeqDataSetFromMatrix(countData=countData[,filter],
+                                colData=df_meta[df_meta$ToD %in% GroupOI,], 
+                                design=~testGroup, tidy = TRUE)
+  
+  # Now we’re ready to run DESEQ function ---------------------------------------
+  
+  dds <- DESeq(dds)
+  
+  # Take a look at the results table --------------------------------------------
+  
+  res <- results(dds)
+  
+  head(results(dds, tidy = TRUE))
+  
+  # Summary of differential gene expression -------------------------------------
+  
+  summary(res) #summary of results
+  
+  # Sort summary list by p-value ------------------------------------------------
+  
+  res <- res[order(res$padj,decreasing = F),]
+  head(res)
+  
+  x_range <- min(max(abs(res$log2FoldChange),na.rm = TRUE),150)
+  y_range <- min(max(-log10(res$pvalue),na.rm = TRUE),150)
+  
+  par(mfrow=c(2,3))
+  
+  for(i in 1:6){
+    plotCounts(dds,
+               gene=row.names(res)[i],
+               intgroup=Day_toggle)
+  }
+  
+  #reset par
+  par(mfrow=c(1,1))
+  # Make a basic volcano plot
+  with(res,
+       plot(log2FoldChange,
+            -log10(pvalue),
+            pch=20,
+            main=paste0(testGroup," Volcano plot"),
+            ylim=c(0,y_range),
+            xlim=c(-x_range,x_range)))
+  
+  # Add colored points: blue if padj<0.01, red if log2FC>1 and padj<0.05)
+  with(subset(res,
+              padj<pAdj_thresh ),
+       points(log2FoldChange,-log10(pvalue),
+              pch=20,
+              col="blue"))
+  
+  with(subset(res,
+              padj<pAdj_thresh & abs(log2FoldChange)>1 & !is.na(padj<pAdj_thresh)),
+       points(log2FoldChange, -log10(pvalue),
+              pch=20,
+              col="red"))
+  
+  dfOut.temp <- res[res$padj<pAdj_thresh & !is.na(res$padj<pAdj_thresh),]
+  dfOut.temp$testGroup <- testGroup
+  
+  if(j == 1){
+    dfOut <- dfOut.temp
+  }else{
+    dfOut <- rbind(dfOut,dfOut.temp)
+  }
+}
+
+
 ```
 
