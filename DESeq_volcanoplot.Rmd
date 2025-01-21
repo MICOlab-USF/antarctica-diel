@@ -81,7 +81,11 @@ Input_data <- separate(Input_data,col = KEGG_ko,into = KEGG_columns,
 # Input_data <- Input_data[!is.na(Input_data$Class),]
 # Input_data$Class_K1 <- paste(Input_data$Class,Input_data$KEGG1,sep = "_")
 
-KO_paths <- read.csv("KO_pathway.csv")
+KO_paths_Bact <- read.csv("KO_pathway.csv")
+KO_paths_Euk <- read.csv("KO_pathway_Euk.csv")
+
+KO_paths <- rbind(KO_paths_Euk,
+                  KO_paths_Bact[!(KO_paths_Bact$K1 %in% KO_paths_Euk$K1),])
 
 Input_data$K1_paths <- unlist(lapply(Input_data$KEGG1,
                                      function(x){
@@ -141,7 +145,7 @@ if(AvgDays == TRUE){
 
 # Rounding data to become integer ####
 
-df.0filtered <- df.count[apply(df.count, 1, function(x){sum(x == 0)}) < 6,]
+df.0filtered <- df.count[apply(df.count, 1, function(x){sum(x == 0)}) < 7,]
 
 if(TPM == TRUE){
  countData <- round(df.0filtered*1000) 
@@ -228,6 +232,7 @@ with(res,
           ylim=c(0,y_range),
           xlim=c(-x_range,x_range)))
 
+
 # Add colored points: blue if padj<0.01, red if log2FC>1 and padj<0.05)
 with(subset(res,
             padj<pAdj_thresh ),
@@ -237,7 +242,7 @@ with(subset(res,
 
 with(subset(res,
             padj<pAdj_thresh & abs(log2FoldChange)>1 & !is.na(padj<pAdj_thresh)),
-     points(log2FoldChange, -log10(pvalue),
+     points(log2FoldChange,-log10(pvalue),
             pch=20,
             col="red"))
 
@@ -313,15 +318,17 @@ for(j in 1:4){
   head(res)
   
   x_range <- min(max(abs(res$log2FoldChange),na.rm = TRUE),150)
-  y_range <- min(max(-log10(res$pvalue),na.rm = TRUE),150)
+  y_range <- min(max(-log10(res$pvalue),na.rm = TRUE),10)
   
   par(mfrow=c(2,3))
-  
+
   for(i in 1:6){
     plotCounts(dds,
                gene=row.names(res)[i],
                intgroup=Day_toggle)
   }
+
+  mtext(testGroup, side = 3, line = -1.5, outer = TRUE)
   
   #reset par
   par(mfrow=c(1,1))
@@ -347,13 +354,32 @@ for(j in 1:4){
               pch=20,
               col="red"))
   
-  dfOut.temp <- res[res$padj<pAdj_thresh & !is.na(res$padj<pAdj_thresh),]
-  dfOut.temp$testGroup <- testGroup
   
-  if(j == 1){
-    dfOut <- dfOut.temp
-  }else{
+  dfOut.temp <- res[res$padj<pAdj_thresh & !is.na(res$padj<pAdj_thresh),]
+  if(dim(dfOut.temp)[1] != 0){
+   dfOut.temp$testGroup <- testGroup 
+   
+   dfOut.temp$ko <- row.names(dfOut.temp)
+   
+   source("pathway_API.R")
+   
+   vec <- rep(NA,nrow(dfOut.temp))
+   
+   for(i in 1:nrow(dfOut.temp)){
+     vec[i] <- pathway_API(dfOut.temp$ko[i])$name
+     
+     if(is.na(vec[i])){
+       vec[i] <- dfOut.temp$ko[i]
+     }
+   }
+   
+   row.names(dfOut.temp) <- vec
+  }
+  
+  if(j != 1){
     dfOut <- rbind(dfOut,dfOut.temp)
+  }else{
+    dfOut <- dfOut.temp
   }
 }
 
