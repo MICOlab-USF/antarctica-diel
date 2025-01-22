@@ -219,7 +219,7 @@ for(i in 1:6){
 pAdj_thresh <- 0.01
 
 x_range <- min(max(abs(res$log2FoldChange),na.rm = TRUE),150)
-y_range <- min(max(-log10(res$pvalue),na.rm = TRUE),150)
+y_range <- min(max(-log10(res$pvalue),na.rm = TRUE),10)
 
 #reset par
 par(mfrow=c(1,1))
@@ -383,6 +383,75 @@ for(j in 1:4){
   }
 }
 
+
+```
+
+
+```{r}
+df_UpDown <- matrix(NA,nrow = length(unique(dfOut$ko)),ncol = 4)
+colnames(df_UpDown) <- c("morning","afternoon","evening","night")
+rownames(df_UpDown) <- unique(dfOut$ko)
+
+for(i in 1:4){
+  df.temp <- dfOut[dfOut$testGroup == colnames(df_UpDown)[i],]
+  
+  for(j in 1:nrow(df_UpDown)){
+   # vec <- ifelse(rownames(df_UpDown)[j] %in% df.temp$ko,
+   #               ifelse(df.temp$log2FoldChange[df.temp$ko == rownames(df_UpDown)[j]]<0,0,2),
+   #               1)
+    
+    vec <- ifelse(rownames(df_UpDown)[j] %in% df.temp$ko,
+                 df.temp$log2FoldChange[df.temp$ko == rownames(df_UpDown)[j]],
+                 0)
+   
+   df_UpDown[j,i] <- vec
+  }
+}
+
+library(pheatmap)
+
+Pathway_cols <- c("#1B9E77","#D95F02","#7570B3","#E7298A",
+                  "#66A61E","#E6AB02","#A6761D","#7FC97F",
+                  "#BEAED4","#FDC086","#FFFF99","#386CB0",
+                  "#F0027F","#BF5B17")
+names(Pathway_cols) <- paths
+# names(Pathway_cols) <- top10_all
+
+Class_cols <- c('#f0b08f','#60555f','#9fd6e6','#63a375')
+names(Class_cols) <- Class_of_interest
+
+Count_cols <- list(# "Pathway" = Pathway_cols,
+                   # "Class" = Class_cols,
+                   # "Day" = c("Day1" = "darkgreen",
+                   #            "Day2" = "blueviolet"),
+                   "ToD" = c("afternoon" = "#F7F4B7",
+                                     "night" = "darkblue",
+                                     "morning" = "#B7E1DD",
+                                     "evening" = "orange"))
+
+Class_df <- data.frame(KO_paths[KO_paths$K1 %in% dfOut$ko,2])
+names(Class_df) <- c("Pathway")
+rownames(Class_df) <- KO_paths[KO_paths$K1 %in% dfOut$ko,1]
+
+MetaData_df <- data.frame(matrix(GroupOI,ncol = 1))
+names(MetaData_df) <- "ToD"
+rownames(MetaData_df) <- GroupOI
+
+heat_plot <- pheatmap((df_UpDown),
+             col = brewer.pal(10, 'RdBu'),
+             cluster_rows = T, cluster_cols = T, # set to FALSE if you want to remove the dendograms
+             clustering_distance_cols = 'euclidean',
+             clustering_distance_rows = 'euclidean',
+             clustering_method = 'ward.D',
+             annotation_row = Class_df,
+             annotation_names_row = T,
+             annotation_col = MetaData_df,
+             annotation_names_col = T,
+             annotation_colors = Count_cols,
+             show_rownames = F, show_colnames = F,
+                          fontsize_row = 7,
+                          fontsize_col = 5,
+             )
 
 ```
 
