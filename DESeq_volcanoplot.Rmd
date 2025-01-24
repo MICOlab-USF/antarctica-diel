@@ -60,7 +60,7 @@ When you click the **Knit** button a document will be generated that includes bo
 
 ```{r, Data setup}
 
-Input_data <- Euk.Sub
+Input_data <- Bact.Sub
 
 for(i in 1:nrow(Input_data)){
   if(i == 1){
@@ -277,6 +277,7 @@ for(i in 1:n){
              main = row.names(dfOut)[i])
 }
 ```
+
 ```{r}
 
 if(AvgDays == TRUE){
@@ -410,17 +411,35 @@ for(i in 1:4){
 
 library(pheatmap)
 
-Pathway_cols <- c("#1B9E77","#D95F02","#7570B3","#E7298A",
+Class_df <- data.frame(KO_paths[KO_paths$K1 %in% dfOut$ko,2])
+names(Class_df) <- c("Pathway")
+rownames(Class_df) <- KO_paths[KO_paths$K1 %in% dfOut$ko,1]
+
+Class_df[Class_df[,1] == "",1] <- "-"
+
+MetaData_df <- data.frame(matrix(GroupOI,ncol = 1))
+names(MetaData_df) <- "ToD"
+rownames(MetaData_df) <- GroupOI
+
+for(i in 1:nrow(Class_df)){
+  vec <- pathway_API(Class_df[i,1])$name
+  
+  if(is.na(vec)){
+    vec <- "-"
+  }
+  
+  Class_df[i,1] <- vec
+}
+
+Pathway_cols <- c("white","#D95F02","#7570B3","#E7298A",
                   "#66A61E","#E6AB02","#A6761D","#7FC97F",
                   "#BEAED4","#FDC086","#FFFF99","#386CB0",
-                  "#F0027F","#BF5B17")
-names(Pathway_cols) <- paths
+                  "#F0027F","#BF5B17","darkblue","black",
+                  "#E41A1C","#377EB8","#4DAF4A","#984EA3")
+names(Pathway_cols) <- unique(Class_df[,1])
 # names(Pathway_cols) <- top10_all
 
-Class_cols <- c('#f0b08f','#60555f','#9fd6e6','#63a375')
-names(Class_cols) <- Class_of_interest
-
-Count_cols <- list(# "Pathway" = Pathway_cols,
+Count_cols <- list("Pathway" = Pathway_cols,
                    # "Class" = Class_cols,
                    # "Day" = c("Day1" = "darkgreen",
                    #            "Day2" = "blueviolet"),
@@ -428,14 +447,6 @@ Count_cols <- list(# "Pathway" = Pathway_cols,
                                      "night" = "darkblue",
                                      "morning" = "#B7E1DD",
                                      "evening" = "orange"))
-
-Class_df <- data.frame(KO_paths[KO_paths$K1 %in% dfOut$ko,2])
-names(Class_df) <- c("Pathway")
-rownames(Class_df) <- KO_paths[KO_paths$K1 %in% dfOut$ko,1]
-
-MetaData_df <- data.frame(matrix(GroupOI,ncol = 1))
-names(MetaData_df) <- "ToD"
-rownames(MetaData_df) <- GroupOI
 
 heat_plot <- pheatmap((df_UpDown),
              col = brewer.pal(10, 'RdBu'),
@@ -452,6 +463,12 @@ heat_plot <- pheatmap((df_UpDown),
                           fontsize_row = 7,
                           fontsize_col = 5,
              )
+
+# name_vec <- "Heatmaps/Bact_UpDown_pathways.pdf"
+# 
+# pdf(name_vec, height = 25, width = 20)
+# heat_plot
+# dev.off()
 
 ```
 
