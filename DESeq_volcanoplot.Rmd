@@ -61,6 +61,7 @@ When you click the **Knit** button a document will be generated that includes bo
 ```{r, Data setup}
 
 Input_data <- Bact.Sub
+# Input_data <- rbind(Euk.Sub,Prok.Sub)
 
 for(i in 1:nrow(Input_data)){
   if(i == 1){
@@ -79,7 +80,7 @@ Input_data <- separate(Input_data,col = KEGG_ko,into = KEGG_columns,
                      sep = ",", remove = FALSE, fill = "right", extra = "drop")
 
 # Input_data <- Input_data[!is.na(Input_data$Class),]
-# Input_data$Class_K1 <- paste(Input_data$Class,Input_data$KEGG1,sep = "_")
+Input_data$Domain_K1 <- paste(Input_data$Domain,Input_data$KEGG1,sep = "_")
 
 KO_paths_Bact <- read.csv("KO_pathway.csv")
 KO_paths_Euk <- read.csv("KO_pathway_Euk.csv")
@@ -95,7 +96,7 @@ source("summary_count.R")
 
 day.vec <- paste(meta.data$SampleID,"_quant",sep = "")
 
-df.count <- summary_count(Input_data,Col_vec = day.vec,Col_filter = "KEGG1")
+df.count <- summary_count(Input_data,Col_vec = day.vec,Col_filter = "Domain_K1")
 
 names(df.count) <- unlist(lapply(names(df.count),
                                  function(x){unlist(strsplit(x,
@@ -279,6 +280,7 @@ for(i in 1:n){
 ```
 
 ```{r}
+source("pathway_API.R")
 
 if(AvgDays == TRUE){
   filter <- c("SequenceID",df_meta$AssemblyGroup[df_meta$ToD %in% GroupOI])
@@ -291,9 +293,12 @@ GroupOI <- c("morning","afternoon","evening","night")
 pAdj_thresh <- 0.01
 
 for(j in 1:4){
-  testGroup <- GroupOI[j]
+  testGroup_vec <- GroupOI[j]
   
-  df_meta$testGroup <- unlist(lapply(df_meta$ToD,function(x){ifelse(x == testGroup,testGroup,"other")}))
+  df_meta$testGroup <- unlist(lapply(df_meta$ToD,function(x){ifelse(x == testGroup_vec,testGroup_vec,"other")}))
+  
+  df_meta <- df_meta %>%
+    mutate(testGroup = factor(testGroup,levels = c("other",testGroup_vec)))
   
   dds <- DESeqDataSetFromMatrix(countData=countData[,filter],
                                 colData=df_meta[df_meta$ToD %in% GroupOI,], 
@@ -326,10 +331,10 @@ for(j in 1:4){
   for(i in 1:6){
     plotCounts(dds,
                gene=row.names(res)[i],
-               intgroup=Day_toggle)
+               intgroup="testGroup")
   }
 
-  mtext(testGroup, side = 3, line = -1.5, outer = TRUE)
+  mtext(testGroup_vec, side = 3, line = -1.5, outer = TRUE)
   
   #reset par
   par(mfrow=c(1,1))
@@ -338,7 +343,7 @@ for(j in 1:4){
        plot(log2FoldChange,
             -log10(pvalue),
             pch=20,
-            main=paste0(testGroup," Volcano plot"),
+            main=paste0(testGroup_vec," Volcano plot"),
             ylim=c(0,y_range),
             xlim=c(-x_range,x_range)))
   
@@ -357,34 +362,75 @@ for(j in 1:4){
   
   
   dfOut.temp <- res[res$padj<pAdj_thresh & !is.na(res$padj<pAdj_thresh),]
+  
   if(dim(dfOut.temp)[1] != 0){
-   dfOut.temp$testGroup <- testGroup 
+   dfOut.temp$testGroup <- testGroup_vec
    
    dfOut.temp$ko <- row.names(dfOut.temp)
-   
-   source("pathway_API.R")
-   
-   vec <- rep(NA,nrow(dfOut.temp))
-   
-   for(i in 1:nrow(dfOut.temp)){
-     vec[i] <- pathway_API(dfOut.temp$ko[i])$name
-     
-     if(is.na(vec[i])){
-       vec[i] <- dfOut.temp$ko[i]
-     }
-   }
-   
-   row.names(dfOut.temp) <- vec
+
+   # vec <- rep(NA,nrow(dfOut.temp))
+   # 
+   # for(i in 1:nrow(dfOut.temp)){
+   #   vec[i] <- pathway_API(dfOut.temp$ko[i])$name
+   # 
+   #   if(is.na(vec[i])){
+   #     vec[i] <- dfOut.temp$ko[i]
+   #   }
+   # }
+   # 
+   # row.names(dfOut.temp) <- vec
   }
+  
+  res$testGroup <- testGroup_vec
   
   if(j != 1){
     dfOut <- rbind(dfOut,dfOut.temp)
+    dfOut_all <- rbind(dfOut_all,res)
   }else{
     dfOut <- dfOut.temp
+    dfOut_all <- res
   }
 }
 
 
+```
+
+
+```{r}
+
+dfOut_all$colorGroup <- "insig"
+dfOut_all$colorGroup[dfOut_all$padj < pAdj_thresh &
+                       !is.na(dfOut_all$padj<pAdj_thresh)] <- "sig"
+
+dfOut_all$colorGroup[dfOut_all$padj < pAdj_thresh &
+                       !is.na(dfOut_all$padj<pAdj_thresh) &
+                       abs(dfOut_all$log2FoldChange) >1] <- "sigLarge"
+
+ggplot(dfOut_all)+
+  geom_point(aes(x = log2FoldChange,
+                 y = -log(pvalue,10),
+                 color = colorGroup))+
+  facet_wrap(facets = "testGroup",
+             nrow = 2, ncol = 2,
+             scale = "free_y")+
+  scale_color_manual(values = c("insig" = "black",
+                       "sig" = "blue",
+                       "sigLarge" = "red"))+
+  theme_classic(base_size = 16)+
+  theme(legend.title=element_blank(),
+        legend.position = "right",
+        legend.key.size = unit(1.5, "cm"),
+        axis.text = element_text(colour = "black"),
+        axis.ticks = element_line(colour = "black"),
+        panel.border = element_rect(linewidth = 1,
+                                    colour = "black",
+                                    fill = NA),
+        strip.background.x =  element_rect(colour = NA,
+                                           fill = NA),
+        strip.text.x = element_text(face = "bold",
+                                    size = 20),
+        strip.text.y = element_text(face = "bold",
+                                    size = 15))
 ```
 
 
@@ -397,13 +443,13 @@ for(i in 1:4){
   df.temp <- dfOut[dfOut$testGroup == colnames(df_UpDown)[i],]
   
   for(j in 1:nrow(df_UpDown)){
-   # vec <- ifelse(rownames(df_UpDown)[j] %in% df.temp$ko,
-   #               ifelse(df.temp$log2FoldChange[df.temp$ko == rownames(df_UpDown)[j]]<0,0,2),
-   #               1)
-    
-    vec <- ifelse(rownames(df_UpDown)[j] %in% df.temp$ko,
-                 df.temp$log2FoldChange[df.temp$ko == rownames(df_UpDown)[j]],
+   vec <- ifelse(rownames(df_UpDown)[j] %in% df.temp$ko,
+                 ifelse(df.temp$log2FoldChange[df.temp$ko == rownames(df_UpDown)[j]]<0,-1,1),
                  0)
+    
+    # vec <- ifelse(rownames(df_UpDown)[j] %in% df.temp$ko,
+    #              df.temp$log2FoldChange[df.temp$ko == rownames(df_UpDown)[j]],
+    #              0)
    
    df_UpDown[j,i] <- vec
   }
@@ -449,7 +495,7 @@ Count_cols <- list("Pathway" = Pathway_cols,
                                      "evening" = "orange"))
 
 heat_plot <- pheatmap((df_UpDown),
-             col = brewer.pal(10, 'RdBu'),
+             col = brewer.pal(3, 'RdBu'),
              cluster_rows = T, cluster_cols = T, # set to FALSE if you want to remove the dendograms
              clustering_distance_cols = 'euclidean',
              clustering_distance_rows = 'euclidean',
