@@ -60,8 +60,8 @@ When you click the **Knit** button a document will be generated that includes bo
 
 ```{r, Data setup}
 
-# Input_data <- Prok.Sub
-Input_data <- rbind(Euk.Sub,Bact.Sub)
+Input_data <- Bact.Sub
+# Input_data <- rbind(Euk.Sub,Bact.Sub)
 
 for(i in 1:nrow(Input_data)){
   if(i == 1){
@@ -79,9 +79,6 @@ KEGG_columns <- paste("KEGG",1:n_KEGG,sep = "")
 Input_data <- separate(Input_data,col = KEGG_ko,into = KEGG_columns,
                      sep = ",", remove = FALSE, fill = "right", extra = "drop")
 
-# Input_data <- Input_data[!is.na(Input_data$Class),]
-Input_data$Domain_K1 <- paste(Input_data$Domain,Input_data$KEGG1,sep = "_")
-
 KO_paths_Bact <- read.csv("KO_pathway.csv")
 KO_paths_Euk <- read.csv("KO_pathway_Euk.csv")
 
@@ -91,6 +88,9 @@ KO_paths <- rbind(KO_paths_Euk,
 Input_data$K1_paths <- unlist(lapply(Input_data$KEGG1,
                                      function(x){
                                        ifelse(x == "-","",KO_paths$ko[KO_paths$K1 == x])}))
+
+# Input_data <- Input_data[!is.na(Input_data$Class),]
+Input_data$Domain_K1 <- paste(Input_data$Domain,Input_data$K1_paths,sep = "_")
 
 source("summary_count.R")
 
@@ -165,7 +165,6 @@ tail(countData)
 You can also embed plots, for example:
 
 ```{r pressure, echo=FALSE}
-
 Day_toggle <- "ToD"
 
 GroupOI <- c("morning","afternoon","evening","night")#[c(4)]
@@ -188,6 +187,27 @@ if(Day_toggle == "ToD"){
 
 dds
 
+# PCA analysis #####-----------------------------------------------------------
+
+vsdata <- varianceStabilizingTransformation(dds, blind = FALSE)
+
+pcaData <- plotPCA(vsdata,
+                   intgroup=c("Day.num","ToD"),
+                   returnData = TRUE)
+percentVar <- round(100 * attr(pcaData, "percentVar"))
+ggplot(pcaData, aes(PC1, PC2, color=Day.num, shape=ToD)) +
+  geom_vline(xintercept = 0) +
+  geom_hline(yintercept = 0) +
+  geom_point(size=3) +
+  xlab(paste0("PC1: ",percentVar[1],"% variance")) +
+  ylab(paste0("PC2: ",percentVar[2],"% variance")) + 
+  coord_fixed() +
+  scale_colour_brewer(type="qual", palette="Dark2")+
+  theme_classic()
+```
+
+
+```{r pressure, echo=FALSE}
 # Now we’re ready to run DESEQ function ---------------------------------------
 
 dds <- DESeq(dds)
@@ -214,9 +234,7 @@ for(i in 1:6){
              gene=row.names(res)[i],
              intgroup=Day_toggle)
 }
-```
 
-```{r, Volcano Plot}
 pAdj_thresh <- 0.01
 
 x_range <- min(max(abs(res$log2FoldChange),na.rm = TRUE),150)
@@ -416,8 +434,7 @@ dfOut_all$colorGroup[dfOut_all$padj < pAdj_thresh &
 ggplot(dfOut_all)+
   geom_point(aes(x = log2FoldChange,
                  y = -log(pvalue,10),
-                 color = colorGroup,
-                 shape = Domain))+
+                 color = colorGroup))+
   facet_wrap(facets = "testGroup",
              nrow = 2, ncol = 2,
              scale = "free_y")+
@@ -525,4 +542,5 @@ heat_plot <- pheatmap((df_UpDown),
 # dev.off()
 
 ```
+
 
