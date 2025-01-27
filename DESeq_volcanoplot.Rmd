@@ -60,8 +60,8 @@ When you click the **Knit** button a document will be generated that includes bo
 
 ```{r, Data setup}
 
-Input_data <- Bact.Sub
-# Input_data <- rbind(Euk.Sub,Prok.Sub)
+# Input_data <- Prok.Sub
+Input_data <- rbind(Euk.Sub,Bact.Sub)
 
 for(i in 1:nrow(Input_data)){
   if(i == 1){
@@ -398,6 +398,13 @@ for(j in 1:4){
 
 ```{r}
 
+dfOut_all <- dfOut_all[!is.na(dfOut_all$pvalue),]
+
+dfOut_all$Domain <- unlist(lapply(row.names(dfOut_all),
+                                  function(x){unlist(strsplit(x,
+                                                              split = "_",
+                                                              fixed = TRUE))[1]}))
+
 dfOut_all$colorGroup <- "insig"
 dfOut_all$colorGroup[dfOut_all$padj < pAdj_thresh &
                        !is.na(dfOut_all$padj<pAdj_thresh)] <- "sig"
@@ -409,7 +416,8 @@ dfOut_all$colorGroup[dfOut_all$padj < pAdj_thresh &
 ggplot(dfOut_all)+
   geom_point(aes(x = log2FoldChange,
                  y = -log(pvalue,10),
-                 color = colorGroup))+
+                 color = colorGroup,
+                 shape = Domain))+
   facet_wrap(facets = "testGroup",
              nrow = 2, ncol = 2,
              scale = "free_y")+
