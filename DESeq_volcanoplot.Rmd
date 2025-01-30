@@ -60,8 +60,8 @@ When you click the **Knit** button a document will be generated that includes bo
 
 ```{r, Data setup}
 
-Input_data <- Bact.Sub
-# Input_data <- rbind(Euk.Sub,Bact.Sub)
+# Input_data <- Bact.Sub
+Input_data <- rbind(Euk.Sub,Bact.Sub)
 
 for(i in 1:nrow(Input_data)){
   if(i == 1){
@@ -90,7 +90,7 @@ Input_data$K1_paths <- unlist(lapply(Input_data$KEGG1,
                                        ifelse(x == "-","",KO_paths$ko[KO_paths$K1 == x])}))
 
 # Input_data <- Input_data[!is.na(Input_data$Class),]
-Input_data$Domain_K1 <- paste(Input_data$Domain,Input_data$K1_paths,sep = "_")
+Input_data$Domain_K1 <- paste(Input_data$Domain,Input_data$KEGG1,sep = "_")
 
 source("summary_count.R")
 
@@ -146,7 +146,7 @@ if(AvgDays == TRUE){
 
 # Rounding data to become integer ####
 
-df.0filtered <- df.count[apply(df.count, 1, function(x){sum(x == 0)}) < 7,]
+df.0filtered <- df.count[apply(df.count, 1, function(x){sum(x == 0)}) < 24,]
 
 if(TPM == TRUE){
  countData <- round(df.0filtered*1000) 
@@ -199,8 +199,10 @@ ggplot(pcaData, aes(PC1, PC2, color=Day.num, shape=ToD)) +
   geom_vline(xintercept = 0) +
   geom_hline(yintercept = 0) +
   geom_point(size=3) +
-  xlab(paste0("PC1: ",percentVar[1],"% variance")) +
-  ylab(paste0("PC2: ",percentVar[2],"% variance")) + 
+  labs(x = paste0("PC1: ",percentVar[1],"% variance"),
+       y = paste0("PC2: ",percentVar[2],"% variance"))+
+  # xlab(paste0("PC1: ",percentVar[1],"% variance")) +
+  # ylab(paste0("PC2: ",percentVar[2],"% variance")) + 
   coord_fixed() +
   scale_colour_brewer(type="qual", palette="Dark2")+
   theme_classic()
@@ -384,19 +386,27 @@ for(j in 1:4){
   if(dim(dfOut.temp)[1] != 0){
    dfOut.temp$testGroup <- testGroup_vec
    
-   dfOut.temp$ko <- row.names(dfOut.temp)
+   # dfOut.temp$ko <- row.names(dfOut.temp)
+   dfOut.temp$Domain <- unlist(lapply(row.names(dfOut.temp),
+                                  function(x){unlist(strsplit(x,
+                                                              split = "_",
+                                                              fixed = TRUE))[1]}))
+   dfOut.temp$ko <- unlist(lapply(row.names(dfOut.temp),
+                                  function(x){unlist(strsplit(x,
+                                                              split = "_",
+                                                              fixed = TRUE))[2]}))
 
-   # vec <- rep(NA,nrow(dfOut.temp))
-   # 
-   # for(i in 1:nrow(dfOut.temp)){
-   #   vec[i] <- pathway_API(dfOut.temp$ko[i])$name
-   # 
-   #   if(is.na(vec[i])){
-   #     vec[i] <- dfOut.temp$ko[i]
-   #   }
-   # }
-   # 
-   # row.names(dfOut.temp) <- vec
+   vec <- rep(NA,nrow(dfOut.temp))
+
+   for(i in 1:nrow(dfOut.temp)){
+     vec[i] <- pathway_API(dfOut.temp$ko[i])$name
+
+     if(is.na(vec[i])){
+       vec[i] <- dfOut.temp$ko[i]
+     }
+   }
+
+   row.names(dfOut.temp) <- vec
   }
   
   res$testGroup <- testGroup_vec
@@ -427,20 +437,24 @@ dfOut_all$colorGroup <- "insig"
 dfOut_all$colorGroup[dfOut_all$padj < pAdj_thresh &
                        !is.na(dfOut_all$padj<pAdj_thresh)] <- "sig"
 
-dfOut_all$colorGroup[dfOut_all$padj < pAdj_thresh &
-                       !is.na(dfOut_all$padj<pAdj_thresh) &
-                       abs(dfOut_all$log2FoldChange) >1] <- "sigLarge"
+# dfOut_all$colorGroup[dfOut_all$padj < pAdj_thresh &
+#                        !is.na(dfOut_all$padj<pAdj_thresh) &
+#                        abs(dfOut_all$log2FoldChange) >1] <- "sigLarge"
 
 ggplot(dfOut_all)+
+  geom_vline(xintercept = c(-1,1))+
   geom_point(aes(x = log2FoldChange,
                  y = -log(pvalue,10),
-                 color = colorGroup))+
+                 color = Domain,
+                 shape = colorGroup))+
   facet_wrap(facets = "testGroup",
              nrow = 2, ncol = 2,
              scale = "free_y")+
-  scale_color_manual(values = c("insig" = "black",
-                       "sig" = "blue",
-                       "sigLarge" = "red"))+
+  scale_shape_manual(values = c("insig" = 46,
+                       "sig" = 16,
+                       "sigLarge" = 16))+
+  scale_color_manual(values = c("Bacteria" = "dodgerblue",
+                                "Eukaryota" = "goldenrod"))+
   theme_classic(base_size = 16)+
   theme(legend.title=element_blank(),
         legend.position = "right",
