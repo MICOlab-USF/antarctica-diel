@@ -13,7 +13,7 @@ rm(list = ls())
 package.list <- c("dplyr","tidyverse","ggplot2",
                   "lemon","vegan","Rmisc",
                   "lubridate","patchwork","stringi",
-                  "RColorBrewer")
+                  "RColorBrewer","pheatmap")
 
 if(!all(package.list %in% installed.packages()[,"Package"])){
   install.packages(package.list[!(package.list %in% installed.packages()[,"Package"])])
@@ -36,13 +36,14 @@ library(vegan)
 library(Rmisc)
 library(lubridate)
 library(RColorBrewer)
+library(pheatmap)
 
 library(phyloseq)
 library(patchwork)
 library(DESeq2)
 library(stringi)
 
-TPM <- TRUE
+TPM <- FALSE
 
 if(TPM == TRUE){
   load("CSV_files/Subsections.RData",verbose = TRUE)
@@ -60,8 +61,8 @@ When you click the **Knit** button a document will be generated that includes bo
 
 ```{r, Data setup}
 
-# Input_data <- Bact.Sub
-Input_data <- rbind(Euk.Sub,Bact.Sub)
+Input_data <- Bact.Sub
+# Input_data <- rbind(Euk.Sub,Bact.Sub)
 
 for(i in 1:nrow(Input_data)){
   if(i == 1){
@@ -108,7 +109,7 @@ df_meta <- meta.data[,c("SampleID","SampleName","AssemblyGroup","Day.num","ToD")
 
 
 # Optional extra step to average the replicates of each day ####
-AvgDays <- T
+AvgDays <- F
 
 if(AvgDays == TRUE){
   # Input_data <- Bact.Sub
@@ -159,38 +160,6 @@ countData <- cbind.data.frame("SequenceID" = row.names(df.0filtered),countData)
 head(countData)
 tail(countData)
 ```
-
-```{r}
-
-dfOut <- t(apply(df.count,1,function(x){(x-mean(x))/sd(x)}))
-# dfOut <- df.count
-
-dfOut <- cbind.data.frame(dfOut,"Gene" = row.names(dfOut))[-3,]
-
-Order_vec <- c("Day1_morning","Day1_afternoon",
-               "Day1_evening","Day1_night",
-               "Day2_morning","Day2_afternoon",
-               "Day2_evening","Day2_night")
-
-# dfOut <- pivot_longer(dfOut,cols = 1:8,names_to = "ToD",values_to = "TPM") %>% 
-#   mutate(ToD = factor(ToD,
-#                       levels = Order_vec))
-
-random_select <- sample(nrow(dfOut))
-
-dfOut <- pivot_longer(dfOut[random_select,],cols = 1:8,names_to = "ToD",values_to = "TPM")
-dfOut$ToD <- unlist(lapply(dfOut$ToD,function(x){(1:8)[Order_vec == x]}))
-
-ggplot(dfOut)+
-  geom_line(aes(x = ToD,
-                y = TPM,
-                group = Gene))+
-  scale_x_continuous(breaks = 1:8,
-                     labels = Order_vec)+
-  theme(legend.position = "none")
-  
-```
-
 
 ## Including Plots
 
