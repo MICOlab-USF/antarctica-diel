@@ -43,6 +43,8 @@ library(patchwork)
 library(DESeq2)
 library(stringi)
 
+library(rain)
+
 TPM <- TRUE
 
 if(TPM == TRUE){
@@ -105,7 +107,7 @@ df_meta <- meta.data[,c("SampleID","SampleName","AssemblyGroup","Day.num","ToD")
 
 
 # Optional extra step to average the replicates of each day ####
-AvgDays <- T
+AvgDays <- F
 
 if(AvgDays == TRUE){
   # Input_data <- Bact.Sub
@@ -182,24 +184,84 @@ ggplot(dfOut_long)+
 
 ```{r}
 
-rainresult <- rain(t(dfOut[,-9]),
+Order_vec <- c("Day1_morning","Day1_afternoon",
+               "Day1_evening","Day1_night",
+               "Day2_morning","Day2_afternoon",
+               "Day2_evening","Day2_night")
+
+df_meta$time_points <- unlist(lapply(df_meta$AssemblyGroup,function(x){((0:7)*6)[Order_vec == x]}))
+time_order <- order(df_meta$time_points)
+
+time_points <- df_meta$time_points[time_order]
+
+# Detrending the dataset, by subtracting the linear model values from the data
+dfOut <- t(apply(df.count[,time_order],1,function(x){x - lm(unlist(x)~time_points)$fitted.values}))
+
+rainresult <- rain(t(dfOut),
                    period = 24,
                    deltat = 6,
+                   nr.series = 3,
                    verbose = T)
 
-rainresult
+# Scaling data using z-score transformation
+dfOut <- t(apply(dfOut,1,function(x){(x-mean(x))/sd(x)}))
+# dfOut <- df.count
 
-best <- order(rainresult$pVal,decreasing = F)[1:10]
-require('lattice')
-xyplot(as.matrix(dfOut[best, -9])
-       ~rep(0:7 * 6, each = 10) |rownames(dfOut)[best],
-       scales = list(y = list(relation = 'free')),
-       layout = c(2, 5), type = 'b', pch = 16, xlab = 'time',
-       ylab = 'expression value', cex.lab = 1)
+dfOut <- cbind.data.frame(dfOut,"Gene" = row.names(dfOut))#[-3,]
 
+rainresult$Gene <- rownames(rainresult)
+
+dfOut2 <- merge(dfOut,rainresult,by = "Gene")
+# dfOut2$Group <- paste(dfOut2$phase,dfOut2$peak.shape,sep = "_")
+
+dfOut2 <- pivot_longer(dfOut2,cols = 2:25,names_to = "ToD",values_to = "TPM")
+# dfOut2$ToD <- unlist(lapply(dfOut2$ToD,function(x){(1:8)[Order_vec == x]}))
+dfOut2$ToD <- unlist(lapply(dfOut2$ToD,function(x){df_meta$time_points[df_meta$SampleID == x]}))
+
+df.summ <- summarySE(dfOut2,measurevar = "TPM",groupvars = c("Gene","ToD"))
+
+dfOut2 <- pivot_wider(df.summ,id_cols = "Gene",
+                      names_from = "ToD",
+                      values_from = "TPM")
+
+dfOut2 <- merge(dfOut2,rainresult,by = "Gene")
+
+dfOut2_long <- pivot_longer(dfOut2,cols = 2:9,names_to = "ToD",values_to = "TPM")
+
+phase_list <- c("Morning","Afternoon","Evening","Night")
+
+# I should probably do some significance adjusting to reduce the number of false positives,
+# Like Holms correction.
+
+dfOut2_long$Sig <- unlist(lapply(dfOut2_long$pVal,function(x){ifelse(x < 0.01,"Sig","Insig")}))
+dfOut2_long$phase <- unlist(lapply(dfOut2_long$phase,function(x){phase_list[c(6,12,18,24) == x]}))
+
+ggplot(dfOut2_long)+
+  geom_line(aes(x = as.numeric(ToD),
+                y = TPM,
+                group = Gene,
+                alpha = Sig,
+                color = Sig))+
+  scale_x_continuous(breaks = c(0,6,12,18,24,30,36,42),
+                     labels = c(phase_list,phase_list))+
+  scale_color_manual(values = c("Sig" = "black",
+                                "insig" = "gray"))+
+  scale_alpha_manual(values = c("Sig" = 1,
+                                   "Insig" = .05))+
+  facet_rep_grid(facets = phase~peak.shape)+
+  labs(y = "Scaled TPM",
+       x = "Time of Day")+
+  theme_classic()+
+  theme(legend.position = "none")
+
+```
+
+
+```{r}
 # Explorations of the rain output:
 unique(rainresult$phase)
 unique(rainresult$peak.shape)
+sum(rainresult$pVal < 0.01)
 sum(rainresult$pVal < 0.01)
 sum(rainresult$pVal < 0.05)
 rainresult[(rainresult$pVal < 0.01),]
