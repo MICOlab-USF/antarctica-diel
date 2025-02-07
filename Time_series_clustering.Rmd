@@ -225,6 +225,13 @@ dfOut2 <- pivot_wider(df.summ,id_cols = "Gene",
                       values_from = "TPM")
 
 dfOut2 <- merge(dfOut2,rainresult,by = "Gene")
+dfOut2 <- dfOut2[order(dfOut2$pVal),]
+
+
+q_val <- 0.01
+abh_metric <- 1:nrow(dfOut2)*(q_val/nrow(dfOut2))
+dfOut2$Sig[dfOut2$pVal <= abh_metric] <- "Sig"
+dfOut2$Sig[dfOut2$pVal > abh_metric] <- "Insig"
 
 dfOut2_long <- pivot_longer(dfOut2,cols = 2:9,names_to = "ToD",values_to = "TPM")
 
@@ -233,7 +240,7 @@ phase_list <- c("Morning","Afternoon","Evening","Night")
 # I should probably do some significance adjusting to reduce the number of false positives,
 # Like Holms correction.
 
-dfOut2_long$Sig <- unlist(lapply(dfOut2_long$pVal,function(x){ifelse(x < 0.01,"Sig","Insig")}))
+# dfOut2_long$Sig <- unlist(lapply(dfOut2_long$pVal,function(x){ifelse(x < 0.01,"Sig","Insig")}))
 dfOut2_long$phase <- unlist(lapply(dfOut2_long$phase,function(x){phase_list[c(6,12,18,24) == x]}))
 
 ggplot(dfOut2_long)+
@@ -253,6 +260,9 @@ ggplot(dfOut2_long)+
        x = "Time of Day")+
   theme_classic()+
   theme(legend.position = "none")
+
+file.name <- "Time_series_plots/UntagledTC.png"
+ggsave(file.name,dpi = 300,width = 15,height = 12)
 
 ```
 
