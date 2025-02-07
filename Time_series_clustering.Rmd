@@ -19,7 +19,7 @@ if(!all(package.list %in% installed.packages()[,"Package"])){
   install.packages(package.list[!(package.list %in% installed.packages()[,"Package"])])
 }
 
-bioc.packages <- c("phyloseq","DESeq2")
+bioc.packages <- c("phyloseq","DESeq2","rain")
 
 if(!all(bioc.packages %in% installed.packages()[,"Package"])){
   if (!require("BiocManager", quietly = TRUE))
@@ -59,8 +59,8 @@ if(TPM == TRUE){
 
 ```{r, Data setup}
 
-Input_data <- Bact.Sub
-# Input_data <- rbind(Euk.Sub,Bact.Sub)
+# Input_data <- Bact.Sub
+Input_data <- rbind(Euk.Sub,Bact.Sub)
 
 for(i in 1:nrow(Input_data)){
   if(i == 1){
@@ -261,7 +261,7 @@ ggplot(dfOut2_long)+
 # Explorations of the rain output:
 unique(rainresult$phase)
 unique(rainresult$peak.shape)
-sum(rainresult$pVal < 0.01)
+sum(rainresult$pVal < 0.0001)
 sum(rainresult$pVal < 0.01)
 sum(rainresult$pVal < 0.05)
 rainresult[(rainresult$pVal < 0.01),]
