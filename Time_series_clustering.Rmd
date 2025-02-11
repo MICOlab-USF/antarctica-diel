@@ -13,7 +13,7 @@ rm(list = ls())
 package.list <- c("dplyr","tidyverse","ggplot2",
                   "lemon","vegan","Rmisc",
                   "lubridate","patchwork","stringi",
-                  "RColorBrewer","pheatmap")
+                  "RColorBrewer","pheatmap","ggh4x")
 
 if(!all(package.list %in% installed.packages()[,"Package"])){
   install.packages(package.list[!(package.list %in% installed.packages()[,"Package"])])
@@ -37,6 +37,7 @@ library(Rmisc)
 library(lubridate)
 library(RColorBrewer)
 library(pheatmap)
+library(ggh4x)
 
 library(phyloseq)
 library(patchwork)
@@ -60,7 +61,7 @@ if(TPM == TRUE){
 ```{r, Data setup}
 
 # Input_data <- Bact.Sub
-Input_data <- rbind(Euk.Sub,Bact.Sub)
+Input_data <- rbind(Euk.Sub,Prok.Sub)
 
 for(i in 1:nrow(Input_data)){
   if(i == 1){
@@ -189,7 +190,9 @@ Order_vec <- c("Day1_morning","Day1_afternoon",
                "Day2_morning","Day2_afternoon",
                "Day2_evening","Day2_night")
 
-df_meta$time_points <- unlist(lapply(df_meta$AssemblyGroup,function(x){((0:7)*6)[Order_vec == x]}))
+Time_vec <- c(0,6,12,18,24,30,36,42)
+
+df_meta$time_points <- unlist(lapply(df_meta$AssemblyGroup,function(x){Time_vec[Order_vec == x]}))
 time_order <- order(df_meta$time_points)
 
 time_points <- df_meta$time_points[time_order]
@@ -227,21 +230,68 @@ dfOut2 <- pivot_wider(df.summ,id_cols = "Gene",
 dfOut2 <- merge(dfOut2,rainresult,by = "Gene")
 dfOut2 <- dfOut2[order(dfOut2$pVal),]
 
+p_adj <- TRUE
+alpha <- 0.01
 
-q_val <- 0.01
-abh_metric <- 1:nrow(dfOut2)*(q_val/nrow(dfOut2))
-dfOut2$Sig[dfOut2$pVal <= abh_metric] <- "Sig"
-dfOut2$Sig[dfOut2$pVal > abh_metric] <- "Insig"
+if(p_adj == TRUE){
+  q_val <- alpha
+  abh_metric <- 1:nrow(dfOut2)*(q_val/nrow(dfOut2))
+  dfOut2$Sig[dfOut2$pVal <= abh_metric] <- "Sig"
+  dfOut2$Sig[dfOut2$pVal > abh_metric] <- "Insig" 
+}
 
-dfOut2_long <- pivot_longer(dfOut2,cols = 2:9,names_to = "ToD",values_to = "TPM")
+dfOut2 <- separate(dfOut2,
+                   col = Gene,
+                   into = c("Domain","ko"),
+                   sep = "_",
+                   remove = FALSE,
+                   fill = "right",
+                   extra = "drop")
+
+dfOut2_long <- pivot_longer(dfOut2,cols = 4:11,names_to = "ToD",values_to = "TPM")
 
 phase_list <- c("Morning","Afternoon","Evening","Night")
 
-# I should probably do some significance adjusting to reduce the number of false positives,
-# Like Holms correction.
-
-# dfOut2_long$Sig <- unlist(lapply(dfOut2_long$pVal,function(x){ifelse(x < 0.01,"Sig","Insig")}))
+if(p_adj == FALSE){
+  dfOut2_long$Sig <- unlist(lapply(dfOut2_long$pVal,function(x){ifelse(x < alpha,"Sig","Insig")}))
+}
 dfOut2_long$phase <- unlist(lapply(dfOut2_long$phase,function(x){phase_list[c(6,12,18,24) == x]}))
+
+# -----------------
+#An attempt at coloring the output based on the density of significant line
+# dfOut2_test <- dfOut2_long
+# 
+# groups_vec <- unique(paste(dfOut2_long$Domain,
+#                            dfOut2_long$phase,
+#                            dfOut2_long$peak.shape))
+# 
+# for(i in 1:length(groups_vec)){
+#   filter <- paste(dfOut2_long$Domain,
+#                   dfOut2_long$phase,
+#                   dfOut2_long$peak.shape) == groups_vec[i]
+# 
+#   dfOut2_test$line_count[filter] <- sum(dfOut2_long$Sig[filter] == "Sig")
+# }
+# 
+# ggplot(dfOut2_test) +
+#   geom_line(aes(x = as.numeric(ToD),
+#                 y = TPM,
+#                 group = Gene,
+#                 color = line_count,
+#                 alpha = Sig)) +
+#   scale_x_continuous(breaks = Time_vec,
+#                      labels = c(phase_list, phase_list)) +
+#   scale_color_gradient(low = "black",high = "darkgreen")+
+#   scale_alpha_manual(values = c("Sig" = 1, "Insig" = .05)) +
+#   facet_nested(
+#     factor(peak.shape, levels = c(6, 12, 18), labels = c("+6", "+12", "+18")) +
+#       factor(Domain, levels = c("Eukaryota", "Bacteria", "Archaea")) ~
+#       factor(phase, levels = c("Morning", "Afternoon", "Evening", "Night"))
+#   ) +
+#   labs(y = "Scaled TPM", x = "Time of Day") +
+#   theme_classic() +
+#   theme(legend.position = "none")
+# -------------------
 
 ggplot(dfOut2_long)+
   geom_line(aes(x = as.numeric(ToD),
@@ -249,33 +299,102 @@ ggplot(dfOut2_long)+
                 group = Gene,
                 alpha = Sig,
                 color = Sig))+
-  scale_x_continuous(breaks = c(0,6,12,18,24,30,36,42),
+  scale_x_continuous(breaks = Time_vec,
                      labels = c(phase_list,phase_list))+
   scale_color_manual(values = c("Sig" = "black",
                                 "insig" = "gray"))+
   scale_alpha_manual(values = c("Sig" = 1,
                                    "Insig" = .05))+
-  facet_rep_grid(facets = phase~peak.shape)+
+  # facet_rep_grid(facets = phase~peak.shape)+
+  facet_nested(factor(peak.shape,
+                      levels = c(6,12,18),
+                      labels = c("+6","+12","+18")) + factor(Domain,
+                                 levels = c("Eukaryota",
+                                            "Bacteria",
+                                            "Archaea")) ~
+                 factor(phase,
+                        levels = c("Morning","Afternoon",
+                                   "Evening","Night")))+
   labs(y = "Scaled TPM",
        x = "Time of Day")+
   theme_classic()+
   theme(legend.position = "none")
 
 file.name <- "Time_series_plots/UntagledTC.png"
-ggsave(file.name,dpi = 300,width = 15,height = 12)
+ggsave(file.name,dpi = 300,width = 20,height = 12)
+
+df_Diel <- dfOut2
 
 ```
 
 
 ```{r}
 # Explorations of the rain output:
-unique(rainresult$phase)
-unique(rainresult$peak.shape)
-sum(rainresult$pVal < 0.0001)
-sum(rainresult$pVal < 0.01)
-sum(rainresult$pVal < 0.05)
-rainresult[(rainresult$pVal < 0.01),]
-unique(rainresult$phase[(rainresult$pVal < 0.01)])
-unique(paste(rainresult$phase,rainresult$peak.shape,sep = "_"))
+
+paste("Number of cyclical genes with a p value lower than 0.0001:",sum(rainresult$pVal < 0.0001))
+paste("Number of cyclical genes selected using the FDR BH metric:",sum(dfOut2$Sig == "Sig"))
+paste("Number of cyclical genes with a p value lower than 0.01:",sum(rainresult$pVal < 0.01))
+paste("Number of cyclical genes with a p value lower than 0.05:",sum(rainresult$pVal < 0.05))
+
+Percent_Arch <- round((nrow(df_Diel[df_Diel$Domain == "Archaea" & df_Diel$Sig == "Sig",]) / nrow(df_Diel[df_Diel$Domain == "Archaea",]))*100,2)
+Percent_Bact <- round((nrow(df_Diel[df_Diel$Domain == "Bacteria" & df_Diel$Sig == "Sig",]) / nrow(df_Diel[df_Diel$Domain == "Bacteria",]))*100,2)
+Percent_Euk <- round((nrow(df_Diel[df_Diel$Domain == "Eukaryota" & df_Diel$Sig == "Sig",]) / nrow(df_Diel[df_Diel$Domain == "Eukaryota",]))*100,2)
+
+paste("Percentage of Archeae genes that are significantly cyclical:", Percent_Arch)
+paste("Percentage of Eukaryotic genes that are significantly cyclical:", Percent_Euk)
+paste("Percentage of Bacteria genes that are significantly cyclical:", Percent_Bact)
+
 ```
+
+```{r}
+
+Domains <- c("Eukaryota","Bacteria","Archaea")
+phases <- c(6,12,18,24)
+peak.shapes <- c(6,12,18)
+
+n <- 1
+
+df_DielSummed <- data.frame(matrix(nrow = 36,ncol = 4))
+
+for(i in 1:length(Domains)){
+  df.temp <- df_Diel[df_Diel$Domain == Domains[i],]
+  
+  for(j in 1:length(phases)){
+    df.temp2 <- df.temp[df.temp$phase == phases[j],]
+    
+    for(k in 1:length(peak.shapes)){
+      df.temp3 <- df.temp2[df.temp2$peak.shape == peak.shapes[k],]
+      
+      vec <- sum(df.temp3$Sig == "Sig") / nrow(df.temp)
+      # vec <- sum(df.temp3$Sig == "Sig") / nrow(df_Diel)
+      
+      df_DielSummed[n,] <- c(Domains[i],phases[j],peak.shapes[k],round(vec*100,2))
+      n <- n+1
+    }
+  }
+}
+
+names(df_DielSummed) <- c("Domain","phase","peak.shape","PerSig")
+
+ggplot(df_DielSummed)+
+  geom_bar(aes(y = as.numeric(PerSig),
+               x = factor(peak.shape,levels = c(6,12,18),
+                          labels = c("+6","+12","+18"))),
+           stat = "Identity")+
+  facet_nested(.~factor(Domain,levels = c("Eukaryota","Bacteria","Archaea")) +
+                 factor(phase,levels = c(6,12,18,24),
+                               labels = c("Morning","Afternoon","Evening","Night")))+
+  labs(title = "Percent of genes within Domain, that is significantly cyclical",
+       x = "Hours after peak, trough occurs",
+       y = "%",
+       caption = paste(   "Column facets indicate Domain (top), and which time of day the peak of the cycle occurs (bottom).",
+                       "\n The x-axis indicates how many hours after the peak, that the valley occurs. The percentage is cal-",
+                       "\n culated based on the total number of genes within each domain.                                                 "))+
+  theme_classic()
+
+file.name <- "Time_series_plots/PerSig_cycles.png"
+ggsave(file.name,dpi = 300,width = 10,height = 7.5)
+
+```
+
 
