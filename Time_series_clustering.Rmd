@@ -60,8 +60,8 @@ if(TPM == TRUE){
 
 ```{r, Data setup}
 
-# Input_data <- Bact.Sub
-Input_data <- rbind(Euk.Sub,Prok.Sub)
+Input_data <- Bact.Sub
+# Input_data <- rbind(Euk.Sub,Prok.Sub)
 
 for(i in 1:nrow(Input_data)){
   if(i == 1){
@@ -196,12 +196,11 @@ df_meta$time_points <- unlist(lapply(df_meta$AssemblyGroup,function(x){Time_vec[
 
 time_order <- order(df_meta$time_points)
 
-df_meta<- df_meta[time_order,]
-time_points <- df_meta$time_points[time_order]
+df_meta <- df_meta[time_order,]
 
 # Detrending the dataset, by subtracting the linear model values from the data
 # dfOut <- t(apply(df.count[,df_meta$SampleID],1,function(x){x - lm(unlist(x)~df_meta$time_points)$fitted.values}))
-dfOut <- t(apply(vec[,df_meta$SampleID],1,function(x){x - lm(unlist(x)~df_meta$time_points)$fitted.values}))
+dfOut <- t(apply(df.count[,df_meta$SampleID],1,function(x){x - lm(unlist(x)~df_meta$time_points)$fitted.values}))
 
 rainresult <- rain(t(dfOut),
                    period = 24,
@@ -401,18 +400,18 @@ ggsave(file.name,dpi = 300,width = 10,height = 7.5)
 ```
 
 ```{r,echo=FALSE,include=FALSE,results='hide'}
-library(rain)
-library(ggplot2)
-library(dplyr)
-library(tidyverse)
-library(Rmisc)
-library(ggh4x)
-
-salmon.TPM <- read.csv("CSV_files/salmon.merged.TPM.subset5.csv")
-load("meta_data.RData",verbose = T)
-
-df_meta <- meta.data[,c("SampleID","SampleName","AssemblyGroup","Day.num","ToD")] %>%
-  mutate(ToD = factor(ToD,levels = c("morning","afternoon","evening","night")))
+# library(rain)
+# library(ggplot2)
+# library(dplyr)
+# library(tidyverse)
+# library(Rmisc)
+# library(ggh4x)
+# 
+# salmon.TPM <- read.csv("CSV_files/salmon.merged.TPM.subset5.csv")
+# load("meta_data.RData",verbose = T)
+# 
+# df_meta <- meta.data[,c("SampleID","SampleName","AssemblyGroup","Day.num","ToD")] %>%
+#   mutate(ToD = factor(ToD,levels = c("morning","afternoon","evening","night")))
 ```
 
 
@@ -420,13 +419,12 @@ df_meta <- meta.data[,c("SampleID","SampleName","AssemblyGroup","Day.num","ToD")
 
 Time1 <- Sys.time()
 
-vec <- salmon.TPM[sample(nrow(salmon.TPM),size = 300000,replace = F),]
-names(vec) <- unlist(lapply(names(vec),
+names(salmon.TPM) <- unlist(lapply(names(salmon.TPM),
                                  function(x){unlist(strsplit(x,
                                                              split = "_",
                                                              fixed = TRUE))[1]}))
-rownames(vec) <- vec$Name
-vec <- vec[,-1]
+rownames(salmon.TPM) <- salmon.TPM$Name
+salmon.TPM <- salmon.TPM[,-1]
 
 Order_vec <- c("Day1_morning","Day1_afternoon",
                "Day1_evening","Day1_night",
@@ -440,11 +438,10 @@ df_meta$time_points <- unlist(lapply(df_meta$AssemblyGroup,function(x){Time_vec[
 time_order <- order(df_meta$time_points)
 
 df_meta<- df_meta[time_order,]
-time_points <- df_meta$time_points[time_order]
+# time_points <- df_meta$time_points[time_order]
 
 # Detrending the dataset, by subtracting the linear model values from the data
-# dfOut <- t(apply(df.count[,df_meta$SampleID],1,function(x){x - lm(unlist(x)~df_meta$time_points)$fitted.values}))
-dfOut <- t(apply(vec[,df_meta$SampleID],1,function(x){x - lm(unlist(x)~df_meta$time_points)$fitted.values}))
+dfOut <- t(apply(salmon.TPM[,df_meta$SampleID],1,function(x){x - lm(unlist(x)~df_meta$time_points)$fitted.values}))
 
 rainresult <- rain(t(dfOut),
                    period = 24,
@@ -454,32 +451,29 @@ rainresult <- rain(t(dfOut),
 
 # Scaling data using z-score transformation
 dfOut <- t(apply(dfOut,1,function(x){(x-mean(x))/sd(x)}))
-# dfOut <- df.count
 
-dfOut <- cbind.data.frame(dfOut,"Gene" = row.names(dfOut))#[-3,]
+dfOut <- cbind.data.frame(dfOut,"ID" = row.names(dfOut))
 
-rainresult$Gene <- rownames(rainresult)
+rainresult$ID <- rownames(rainresult)
 
-dfOut <- merge(dfOut,rainresult,by = "Gene")
-# dfOut$Group <- paste(dfOut$phase,dfOut$peak.shape,sep = "_")
+dfOut <- merge(dfOut,rainresult,by = "ID")
 
 dfOut <- pivot_longer(dfOut,cols = 2:25,names_to = "ToD",values_to = "TPM")
-# dfOut$ToD <- unlist(lapply(dfOut$ToD,function(x){(1:8)[Order_vec == x]}))
-dfOut$ToD <- unlist(lapply(dfOut$ToD,function(x){df_meta$time_points[df_meta$SampleID == x]}))
+dfOut$ToD <- unlist(lapply(dfOut$ToD,function(x){df_meta$AssemblyGroup[df_meta$SampleID == x]}))
 
-df.summ <- summarySE(dfOut,measurevar = "TPM",groupvars = c("Gene","ToD"))
+df.summ <- summarySE(dfOut,measurevar = "TPM",groupvars = c("ID","ToD"))
 
-dfOut <- pivot_wider(df.summ,id_cols = "Gene",
+dfOut <- pivot_wider(df.summ,id_cols = "ID",
                       names_from = "ToD",
                       values_from = "TPM")
 
-dfOut <- merge(dfOut,rainresult,by = "Gene")
+dfOut <- merge(dfOut,rainresult,by = "ID")
 dfOut <- dfOut[order(dfOut$pVal),]
 
 rm(list = c("rainresult","df.summ"))
 
 p_adj <- TRUE
-alpha <- 0.01
+alpha <- 0.05
 
 if(p_adj == TRUE){
   q_val <- alpha
@@ -488,22 +482,15 @@ if(p_adj == TRUE){
   dfOut$Sig[dfOut$pVal > abh_metric] <- "Insig" 
 }
 
-dfOut <- separate(dfOut,
-                   col = Gene,
-                   into = c("Domain","ko"),
-                   sep = "_",
-                   remove = FALSE,
-                   fill = "right",
-                   extra = "drop")
+# dfOut_long <- pivot_longer(dfOut,cols = 4:11,names_to = "ToD",values_to = "TPM")
+# 
+# phase_list <- c("Morning","Afternoon","Evening","Night")
+# 
+# if(p_adj == FALSE){
+#   dfOut_long$Sig <- unlist(lapply(dfOut_long$pVal,function(x){ifelse(x < alpha,"Sig","Insig")}))
+# }
+# dfOut_long$phase <- unlist(lapply(dfOut_long$phase,function(x){phase_list[c(6,12,18,24) == x]}))
 
-dfOut_long <- pivot_longer(dfOut,cols = 4:11,names_to = "ToD",values_to = "TPM")
-
-phase_list <- c("Morning","Afternoon","Evening","Night")
-
-if(p_adj == FALSE){
-  dfOut_long$Sig <- unlist(lapply(dfOut_long$pVal,function(x){ifelse(x < alpha,"Sig","Insig")}))
-}
-dfOut_long$phase <- unlist(lapply(dfOut_long$phase,function(x){phase_list[c(6,12,18,24) == x]}))
 # -----------------
 #An attempt at coloring the output based on the density of significant line
 # dfOut_test <- dfOut_long
@@ -523,7 +510,7 @@ dfOut_long$phase <- unlist(lapply(dfOut_long$phase,function(x){phase_list[c(6,12
 # ggplot(dfOut_test) +
 #   geom_line(aes(x = as.numeric(ToD),
 #                 y = TPM,
-#                 group = Gene,
+#                 group = ID,
 #                 color = line_count,
 #                 alpha = Sig)) +
 #   scale_x_continuous(breaks = Time_vec,
@@ -540,10 +527,95 @@ dfOut_long$phase <- unlist(lapply(dfOut_long$phase,function(x){phase_list[c(6,12
 #   theme(legend.position = "none")
 # -------------------
 
+# p1 <- ggplot(dfOut_long)+
+#   geom_line(aes(x = as.numeric(ToD),
+#                 y = TPM,
+#                 group = ID,
+#                 alpha = Sig,
+#                 color = Sig),
+#             linewidth = .05)+
+#   scale_x_continuous(breaks = Time_vec,
+#                      labels = c(phase_list,phase_list))+
+#   scale_color_manual(values = c("Sig" = "black",
+#                                 "insig" = "gray"))+
+#   scale_alpha_manual(values = c("Sig" = 1,
+#                                    "Insig" = .005))+
+#   # facet_rep_grid(facets = phase~peak.shape)+
+#   facet_nested(factor(phase,
+#                       levels = c("Morning","Afternoon",
+#                                  "Evening","Night")) ~ 
+#                  factor(peak.shape,
+#                         levels = c(6,12,18),
+#                         labels = c("+6","+12","+18")))+
+#   labs(y = "Scaled TPM",
+#        x = "Time of Day")+
+#   theme_classic()+
+#   theme(legend.position = "none")
+# 
+# file.name <- "Time_series_plots/UntagledTC_AllContigs.png"
+# ggsave(plot = p1,filename = file.name,dpi = 300,width = 15,height = 12)
+
+save(dfOut,df_meta,file = "CSV_files/rainResults_RegSpace.RData")
+
+Sys.time()-Time1
+```
+
+
+
+```{r}
+load("CSV_files/rainResults_RegSpace.RData",verbose = TRUE)
+
+df_meta <- df_meta %>% distinct(AssemblyGroup,.keep_all = T)
+names(dfOut)[2:9] <- unlist(lapply(names(dfOut)[2:9],function(x){df_meta$time_points[df_meta$AssemblyGroup == x]}))
+
+phase_list <- c("Morning","Afternoon","Evening","Night")
+
+dfOut$phase <- unlist(lapply(dfOut$phase,function(x){phase_list[c(6,12,18,24) == x]}))
+
+dfOut_long <- pivot_longer(dfOut,cols = 2:9,names_to = "ToD",values_to = "TPM")
+
+# -----------------
+#An attempt at coloring the output based on the density of significant line
+# dfOut_test <- dfOut_long
+# 
+# groups_vec <- unique(paste(dfOut_long$Domain,
+#                            dfOut_long$phase,
+#                            dfOut_long$peak.shape))
+# 
+# for(i in 1:length(groups_vec)){
+#   filter <- paste(dfOut_long$Domain,
+#                   dfOut_long$phase,
+#                   dfOut_long$peak.shape) == groups_vec[i]
+# 
+#   dfOut_test$line_count[filter] <- sum(dfOut_long$Sig[filter] == "Sig")
+# }
+# 
+# ggplot(dfOut_test) +
+#   geom_line(aes(x = as.numeric(ToD),
+#                 y = TPM,
+#                 group = ID,
+#                 color = line_count,
+#                 alpha = Sig)) +
+#   scale_x_continuous(breaks = Time_vec,
+#                      labels = c(phase_list, phase_list)) +
+#   scale_color_gradient(low = "black",high = "darkgreen")+
+#   scale_alpha_manual(values = c("Sig" = 1, "Insig" = .05)) +
+#   facet_nested(
+#     factor(peak.shape, levels = c(6, 12, 18), labels = c("+6", "+12", "+18")) +
+#       factor(Domain, levels = c("Eukaryota", "Bacteria", "Archaea")) ~
+#       factor(phase, levels = c("Morning", "Afternoon", "Evening", "Night"))
+#   ) +
+#   labs(y = "Scaled TPM", x = "Time of Day") +
+#   theme_classic() +
+#   theme(legend.position = "none")
+# -------------------
+
+Time_vec <- c(0,6,12,18,24,30,36,42)
+
 p1 <- ggplot(dfOut_long)+
   geom_line(aes(x = as.numeric(ToD),
                 y = TPM,
-                group = Gene,
+                group = ID,
                 alpha = Sig,
                 color = Sig),
             linewidth = .05)+
@@ -556,7 +628,7 @@ p1 <- ggplot(dfOut_long)+
   # facet_rep_grid(facets = phase~peak.shape)+
   facet_nested(factor(phase,
                       levels = c("Morning","Afternoon",
-                                 "Evening","Night")) ~ 
+                                 "Evening","Night")) ~
                  factor(peak.shape,
                         levels = c(6,12,18),
                         labels = c("+6","+12","+18")))+
@@ -565,8 +637,7 @@ p1 <- ggplot(dfOut_long)+
   theme_classic()+
   theme(legend.position = "none")
 
-file.name <- "Time_series_plots/UntagledTC_AllContigs.png"
-ggsave(plot = p1,filename = file.name,dpi = 300,width = 15,height = 12)
-
-Sys.time()-Time1
+# file.name <- "Time_series_plots/UntagledTC_AllContigs.png"
+# ggsave(plot = p1,filename = file.name,dpi = 300,width = 15,height = 12)
 ```
+
