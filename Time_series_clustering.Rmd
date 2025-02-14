@@ -19,7 +19,7 @@ if(!all(package.list %in% installed.packages()[,"Package"])){
   install.packages(package.list[!(package.list %in% installed.packages()[,"Package"])])
 }
 
-bioc.packages <- c("phyloseq","DESeq2","rain")
+bioc.packages <- c("phyloseq","DESeq2","rain","limma")
 
 if(!all(bioc.packages %in% installed.packages()[,"Package"])){
   if (!require("BiocManager", quietly = TRUE))
@@ -45,6 +45,7 @@ library(DESeq2)
 library(stringi)
 
 library(rain)
+library(limma)
 
 TPM <- TRUE
 
@@ -574,42 +575,6 @@ dfOut$phase <- unlist(lapply(dfOut$phase,function(x){phase_list[c(6,12,18,24) ==
 
 dfOut_long <- pivot_longer(dfOut,cols = 2:9,names_to = "ToD",values_to = "TPM")
 
-# -----------------
-#An attempt at coloring the output based on the density of significant line
-# dfOut_test <- dfOut_long
-# 
-# groups_vec <- unique(paste(dfOut_long$Domain,
-#                            dfOut_long$phase,
-#                            dfOut_long$peak.shape))
-# 
-# for(i in 1:length(groups_vec)){
-#   filter <- paste(dfOut_long$Domain,
-#                   dfOut_long$phase,
-#                   dfOut_long$peak.shape) == groups_vec[i]
-# 
-#   dfOut_test$line_count[filter] <- sum(dfOut_long$Sig[filter] == "Sig")
-# }
-# 
-# ggplot(dfOut_test) +
-#   geom_line(aes(x = as.numeric(ToD),
-#                 y = TPM,
-#                 group = ID,
-#                 color = line_count,
-#                 alpha = Sig)) +
-#   scale_x_continuous(breaks = Time_vec,
-#                      labels = c(phase_list, phase_list)) +
-#   scale_color_gradient(low = "black",high = "darkgreen")+
-#   scale_alpha_manual(values = c("Sig" = 1, "Insig" = .05)) +
-#   facet_nested(
-#     factor(peak.shape, levels = c(6, 12, 18), labels = c("+6", "+12", "+18")) +
-#       factor(Domain, levels = c("Eukaryota", "Bacteria", "Archaea")) ~
-#       factor(phase, levels = c("Morning", "Afternoon", "Evening", "Night"))
-#   ) +
-#   labs(y = "Scaled TPM", x = "Time of Day") +
-#   theme_classic() +
-#   theme(legend.position = "none")
-# -------------------
-
 Time_vec <- c(0,6,12,18,24,30,36,42)
 
 p1 <- ggplot(dfOut_long)+
@@ -639,5 +604,112 @@ p1 <- ggplot(dfOut_long)+
 
 # file.name <- "Time_series_plots/UntagledTC_AllContigs.png"
 # ggsave(plot = p1,filename = file.name,dpi = 300,width = 15,height = 12)
+```
+
+
+```{r}
+
+# load("CSV_files/Full.merged.RData",verbose = TRUE)
+# 
+# for(i in 1:nrow(Full.merged)){
+#   if(i == 1){
+#     n_KEGG <- length(unlist(strsplit(Full.merged$KEGG_ko[i],",",fixed = TRUE)))
+#   }
+#   m_KEGG <- length(unlist(strsplit(Full.merged$KEGG_ko[i],",",fixed = TRUE)))
+#   
+#   if(m_KEGG > n_KEGG){
+#     n_KEGG <- m_KEGG
+#   }
+# }
+# 
+# KEGG_columns <- paste("KEGG",1:n_KEGG,sep = "")
+# 
+# Full.merged <- separate(Full.merged,col = KEGG_ko,into = KEGG_columns,
+#                      sep = ",", remove = FALSE, fill = "right", extra = "drop")
+# 
+# KO_paths_Bact <- read.csv("KO_pathway.csv")
+# KO_paths_Euk <- read.csv("KO_pathway_Euk.csv")
+# 
+# KO_paths <- rbind(KO_paths_Euk,KO_paths_Bact[!(KO_paths_Bact$K1 %in% KO_paths_Euk$K1),])
+# 
+# Full.merged$K1_paths <- unlist(lapply(Full.merged$KEGG1,
+#                                       function(x){ifelse(x == "-","",KO_paths$ko[KO_paths$K1 == x])}))
+# 
+# names(Full.merged) <- unlist(lapply(names(Full.merged),
+#                                  function(x){unlist(strsplit(x,split = "_",fixed = TRUE))[1]}))
+# 
+# column.drop_list <- c(meta.data$SampleID,"counts","max","full","Unnamed..0","X","KEGG")
+# 
+# Full.merged <- Full.merged[,!(names(Full.merged) %in% column.drop_list)]
+# names(Full.merged)[names(Full.merged) == "SequenceID"] <- "ID"
+# 
+# load("CSV_files/rainResults_RegSpace.RData",verbose = TRUE)
+# 
+# phase_list <- c("Morning","Afternoon","Evening","Night")
+# dfOut$phase <- unlist(lapply(dfOut$phase,function(x){phase_list[c(6,12,18,24) == x]}))
+# 
+# Full.merged_rain <- merge(dfOut,Full.merged, by = "ID",all.x = TRUE)
+# 
+# df_meta <- df_meta %>% distinct(AssemblyGroup,.keep_all = T)
+# 
+# save(Full.merged_rain,meta.data,df_meta,file = "CSV_files/FullMerged_rain.RData")
+
+```
+
+```{r}
+load("CSV_files/FullMerged_rain.RData",verbose = T)
+
+vec <- sample(nrow(Full.merged_rain),1000,replace = F)
+
+names(Full.merged_rain)[2:9] <- unlist(lapply(names(Full.merged_rain)[2:9],function(x){df_meta$time_points[df_meta$AssemblyGroup == x]}))
+
+Full.merged_rain$TaxFunc <- unlist(lapply(Full.merged_rain$Domain,function(x){ifelse(is.na(x),"No","Yes")}))
+
+Full.merged_rain[Full.merged_rain$TaxFunc == "Yes",2:9] <- Full.merged_rain[Full.merged_rain$TaxFunc == "Yes",2:9]+3
+
+dfOut_long <- pivot_longer(Full.merged_rain[vec,],cols = 2:9,names_to = "ToD",values_to = "TPM")
+
+Time_vec <- c(0,6,12,18,24,30,36,42)
+
+p1 <- ggplot(dfOut_long)+
+  geom_line(aes(x = as.numeric(ToD),
+                y = TPM,
+                group = ID,
+                alpha = Sig,
+                color = Sig),
+            linewidth = .05)+
+  scale_x_continuous(breaks = Time_vec,
+                     labels = c(phase_list,phase_list))+
+  scale_color_manual(values = c("Sig" = "black",
+                                "Insig" = "gray"))+
+  scale_alpha_manual(values = c("Sig" = 1,
+                                   "Insig" = .01))+
+  # facet_rep_grid(facets = phase~peak.shape)+
+  facet_nested(factor(phase,
+                      levels = c("Morning","Afternoon",
+                                 "Evening","Night")) ~
+                 factor(peak.shape,
+                        levels = c(6,12,18),
+                        labels = c("+6","+12","+18")))+
+  labs(y = "Scaled TPM",
+       x = "Time of Day")+
+  theme_classic()+
+  theme(legend.position = "none")
+
+p1
+```
+
+```{r}
+load("CSV_files/FullMerged_rain.RData",verbose = T)
+
+vec <- sample(nrow(Full.merged_rain),1000000,replace = F)
+
+# dfOut <- Full.merged_rain[vec,"KEGG1"]
+# row.names(dfOut) <- Full.merged_rain$ID[vec]
+
+kegga.vec <- kegga(Full.merged_rain[,"KEGG1"],geneid = Full.merged_rain$ID)
+topKEGG(kegga.vec)
+
+goana.vec <- goana(Full.merged_rain[,"GOs"],geneid = Full.merged_rain$ID)
 ```
 
