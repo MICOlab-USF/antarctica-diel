@@ -19,7 +19,7 @@ if(!all(package.list %in% installed.packages()[,"Package"])){
   install.packages(package.list[!(package.list %in% installed.packages()[,"Package"])])
 }
 
-bioc.packages <- c("phyloseq","DESeq2","rain","limma")
+bioc.packages <- c("phyloseq","DESeq2","rain","limma","clusterProfiler")
 
 if(!all(bioc.packages %in% installed.packages()[,"Package"])){
   if (!require("BiocManager", quietly = TRUE))
@@ -46,6 +46,7 @@ library(stringi)
 
 library(rain)
 library(limma)
+library(clusterProfiler)
 
 TPM <- TRUE
 
@@ -91,13 +92,13 @@ Input_data$K1_paths <- unlist(lapply(Input_data$KEGG1,
                                        ifelse(x == "-","",KO_paths$ko[KO_paths$K1 == x])}))
 
 # Input_data <- Input_data[!is.na(Input_data$Class),]
-Input_data$Domain_K1 <- paste(Input_data$Domain,Input_data$KEGG1,sep = "_")
+Input_data$Classi_K1 <- paste(Input_data$classification,Input_data$KEGG1,sep = "_")
 
 source("summary_count.R")
 
 day.vec <- paste(meta.data$SampleID,"_quant",sep = "")
 
-df.count <- summary_count(Input_data,Col_vec = day.vec,Col_filter = "Domain_K1")
+df.count <- summary_count(Input_data,Col_vec = day.vec,Col_filter = "Classi_K1")
 
 names(df.count) <- unlist(lapply(names(df.count),
                                  function(x){unlist(strsplit(x,
@@ -311,11 +312,12 @@ ggplot(dfOut2_long)+
   # facet_rep_grid(facets = phase~peak.shape)+
   facet_nested(factor(peak.shape,
                       levels = c(6,12,18),
-                      labels = c("+6","+12","+18")) + factor(Domain,
-                                 levels = c("Eukaryota",
-                                            "Bacteria",
-                                            "Archaea")) ~
-                 factor(phase,
+                      labels = c("+6","+12","+18"))
+               # + factor(Domain,
+               #                   levels = c("Eukaryota",
+               #                              "Bacteria",
+               #                              "Archaea"))
+               ~ factor(phase,
                         levels = c("Morning","Afternoon",
                                    "Evening","Night")))+
   labs(y = "Scaled TPM",
@@ -712,4 +714,27 @@ topKEGG(kegga.vec)
 
 goana.vec <- goana(Full.merged_rain[,"GOs"],geneid = Full.merged_rain$ID)
 ```
+
+```{r}
+
+# https://rpubs.com/jrgonzalezISGlobal/enrichment
+
+in_sig <- sum(Full.merged_rain$Sig == "Sig" & !is.na(Full.merged_rain$Domain))
+in_insig <- sum(Full.merged_rain$Sig == "Insig" & !is.na(Full.merged_rain$Domain))
+
+out_sig <- sum(Full.merged_rain$Sig == "Sig" & is.na(Full.merged_rain$Domain))
+out_insig <- sum(Full.merged_rain$Sig == "Insig" & is.na(Full.merged_rain$Domain))
+
+deTable <- matrix(c(in_sig,in_insig,out_sig,out_insig),
+                  nrow = 2,
+                  dimnames = list(DE=c("Sig","Insig"),
+                                  GeneSet=c("in","out")))
+
+deTable
+
+fisher.test(deTable,alternative = "greater")
+
+```
+
+
 

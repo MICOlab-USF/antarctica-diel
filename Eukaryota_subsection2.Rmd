@@ -48,7 +48,7 @@ meta.data <- separate(meta.data, col = AssemblyGroup, into = c("Day.num","ToD"),
 # meta.data$lubri <- with_tz(mdy_hms(meta.data$datetime, tz = "UTC"),
 #                            tz = "America/Santiago")
 
-COG_categories <- read.csv("CSV_files/COG_categories.csv",sep = ";")
+COG_categories <- read.csv("CSV_files/COG_categories.csv",sep = ",")
 
 Eukaryota.merged <- read.csv("CSV_files/Eukaryota.merged.csv")
 
@@ -238,7 +238,7 @@ p7 <- ggplot(dfOut2)+
 
 p7
 
-ggsave("COG_Class_plots/COG_v_light_plot2.png",width = 15,height = 9,dpi = 300)
+# ggsave("COG_Class_plots/COG_v_light_plot2.png",width = 15,height = 9,dpi = 300)
 ```
 
 Initial exploration of the KEGG data, I found that there are so many different KEGGS if I use the first category in the string of the KEGG's after separating them.
