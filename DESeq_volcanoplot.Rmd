@@ -168,7 +168,7 @@ You can also embed plots, for example:
 ```{r pressure, echo=FALSE}
 Day_toggle <- "ToD"
 
-GroupOI <- c("morning","afternoon","evening","night")#[c(4)]
+GroupOI <- c("morning","afternoon","evening","night")[c(1,3)]
 
 if(AvgDays == TRUE){
   filter <- c("SequenceID",df_meta$AssemblyGroup[df_meta$ToD %in% GroupOI])
