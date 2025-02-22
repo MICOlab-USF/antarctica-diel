@@ -168,7 +168,7 @@ You can also embed plots, for example:
 ```{r pressure, echo=FALSE}
 Day_toggle <- "ToD"
 
-GroupOI <- c("morning","afternoon","evening","night")[c(1,3)]
+GroupOI <- c("morning","afternoon","evening","night")#[c(1,3)]
 
 if(AvgDays == TRUE){
   filter <- c("SequenceID",df_meta$AssemblyGroup[df_meta$ToD %in% GroupOI])
@@ -241,7 +241,7 @@ for(i in 1:6){
 pAdj_thresh <- 0.01
 
 x_range <- min(max(abs(res$log2FoldChange),na.rm = TRUE),150)
-y_range <- min(max(-log10(res$pvalue),na.rm = TRUE),10)
+y_range <- min(max(-log10(res$pvalue),na.rm = TRUE),150)
 
 #reset par
 par(mfrow=c(1,1))
@@ -270,6 +270,7 @@ with(subset(res,
 
 dfOut <- res[res$padj<pAdj_thresh & !is.na(res$padj<pAdj_thresh),]
 ```
+
 
 ```{r}
 dfOut$ko <- row.names(dfOut)
