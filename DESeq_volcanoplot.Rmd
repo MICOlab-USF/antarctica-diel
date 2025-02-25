@@ -61,8 +61,8 @@ When you click the **Knit** button a document will be generated that includes bo
 
 ```{r, Data setup}
 
-Input_data <- Bact.Sub
-# Input_data <- rbind(Euk.Sub,Bact.Sub)
+# Input_data <- Bact.Sub
+Input_data <- rbind(Euk.Sub,Bact.Sub)
 
 for(i in 1:nrow(Input_data)){
   if(i == 1){
@@ -207,8 +207,249 @@ ggplot(pcaData, aes(PC1, PC2, color=Day.num, shape=ToD)) +
   coord_fixed() +
   scale_colour_brewer(type="qual", palette="Dark2")+
   theme_classic()
+
+# ggsave("DE_plots/AllContigs_PCA.png",dpi = 300,width = 8,height = 6)
 ```
 
+```{r pressure, echo=FALSE}
+# Running vst and plotting pair wise PCAs
+load("CSV_files/salmon.merged.numreads.subset5.RData",verbose = T)
+
+df_meta <- meta.data[,c("SampleID","SampleName","AssemblyGroup","Day.num","ToD")] %>%
+  mutate(ToD = factor(ToD,levels = c("morning","afternoon","evening","night")))
+
+countData <- cbind.data.frame("SequenceID" = salmon.numreads[,1],round(salmon.numreads[,-c(1,26)]))
+# countData <- countData[1:1000000,]
+
+n <- 1
+
+for(ToD1 in 1:4){
+  for(ToD2 in 1:4){
+    if(ToD1 < ToD2){
+      
+      Day_toggle <- "ToD"
+
+      GroupOI <- c("morning","afternoon","evening","night")[c(ToD1,ToD2)]
+      
+      # if(AvgDays == TRUE){
+      #   filter <- c("SequenceID",df_meta$AssemblyGroup[df_meta$ToD %in% GroupOI])
+      # } else {
+      #   filter <- c("SequenceID",df_meta$SampleID[df_meta$ToD %in% GroupOI]) 
+      # }
+      
+      filter <- c("SequenceID",df_meta$SampleID[df_meta$ToD %in% GroupOI]) 
+      
+      if(Day_toggle == "ToD"){
+        dds <- DESeqDataSetFromMatrix(countData=countData[,filter],
+                                    colData=df_meta[df_meta$ToD %in% GroupOI,], 
+                                    design=~ToD, tidy = TRUE)
+      } else if(Day_toggle == "Day.num"){
+        dds <- DESeqDataSetFromMatrix(countData=countData[,filter],
+                                    colData=df_meta[df_meta$ToD %in% GroupOI,], 
+                                    design=~Day.num, tidy = TRUE)
+      }
+      
+      dds
+      
+      # PCA analysis #####-----------------------------------------------------------
+      
+      vsdata <- varianceStabilizingTransformation(dds, blind = FALSE)
+      
+      pcaData <- plotPCA(vsdata,
+                         intgroup=c("Day.num","ToD"),
+                         returnData = TRUE)
+      percentVar <- round(100 * attr(pcaData, "percentVar"))
+      PCA_plot <- ggplot(pcaData, aes(PC1, PC2, color=Day.num, shape=ToD)) +
+        geom_vline(xintercept = 0) +
+        geom_hline(yintercept = 0) +
+        geom_point(size=3) +
+        labs(x = paste0("PC1: ",percentVar[1],"% variance"),
+             y = paste0("PC2: ",percentVar[2],"% variance"),
+             title = paste0(GroupOI[1]," vs ",GroupOI[2]))+
+        coord_fixed() +
+        scale_colour_brewer(type="qual", palette="Dark2")+
+        theme_classic()
+      
+      print(PCA_plot)
+      
+      pcaData$ToD1 <- GroupOI[1]
+      pcaData$ToD2 <- GroupOI[2]
+      
+      if(n == 1){
+        dfOut <- pcaData
+      }else{
+        dfOut <- rbind.data.frame(dfOut,pcaData) 
+      }
+      n <- n+1
+    }
+  }
+}
+
+ggplot(dfOut, aes(PC1, PC2, color=Day.num, shape=ToD)) +
+  geom_vline(xintercept = 0) +
+  geom_hline(yintercept = 0) +
+  geom_point(size=3) +
+  labs(x = paste0("PC1"),
+       y = paste0("PC2"),
+       title = "PCA plots")+
+  facet_rep_grid(factor(ToD1, levels = c("morning","afternoon","evening")) ~ factor(ToD2,levels = c("afternoon","evening","night")))+
+  scale_colour_brewer(type="qual", palette="Dark2")+
+  theme_classic()
+
+ggsave("DE_plots/PairWise_PCA.png",dpi = 300,height = 6,width = 8)
+```
+
+```{r pressure, echo=FALSE}
+
+load("CSV_files/salmon.merged.numreads.subset5.RData",verbose = T)
+
+df_meta <- meta.data[,c("SampleID","SampleName","AssemblyGroup","Day.num","ToD")] %>%
+  mutate(ToD = factor(ToD,levels = c("morning","afternoon","evening","night")))
+
+countData <- cbind.data.frame("SequenceID" = salmon.numreads[,1],round(salmon.numreads[,-c(1,26)]))
+
+# rdv <- sample(nrow(salmon.numreads),10000,replace = F)
+# countData <- countData[rdv,]
+
+pAdj_thresh <- 0.05
+
+for(ToD1 in 1:4){
+  if(ToD1 == 1){
+    time1 <- Sys.time()
+    
+    n <- 1
+  }
+  
+  for(ToD2 in 1:4){
+    if(ToD1 < ToD2){
+      
+      Day_toggle <- "ToD"
+
+      GroupOI <- c("morning","afternoon","evening","night")[c(ToD1,ToD2)]
+      
+      print(paste("Run",n,"comparing",GroupOI[1],"against",GroupOI[2]))
+      
+      # if(AvgDays == TRUE){
+      #   filter <- c("SequenceID",df_meta$AssemblyGroup[df_meta$ToD %in% GroupOI])
+      # } else {
+      #   filter <- c("SequenceID",df_meta$SampleID[df_meta$ToD %in% GroupOI]) 
+      # }
+      
+      filter <- c("SequenceID",df_meta$SampleID[df_meta$ToD %in% GroupOI])
+      
+      print("Creating dds object")
+      
+      if(Day_toggle == "ToD"){
+        dds <- DESeqDataSetFromMatrix(countData=countData[,filter],
+                                    colData=df_meta[df_meta$ToD %in% GroupOI,], 
+                                    design=~ToD, tidy = TRUE)
+      } else if(Day_toggle == "Day.num"){
+        dds <- DESeqDataSetFromMatrix(countData=countData[,filter],
+                                    colData=df_meta[df_meta$ToD %in% GroupOI,], 
+                                    design=~Day.num, tidy = TRUE)
+      }
+      
+      # PCA analysis #####-----------------------------------------------------------
+      print("Running DESeq on the dds object")
+      
+      dds <- DESeq(dds)
+  
+      # Take a look at the results table --------------------------------------------
+      print("Running results on the dds after DESeq()")
+      
+      res <- results(dds)
+      
+      # Sort summary list by p-value ------------------------------------------------
+      
+      res <- res[order(res$padj,decreasing = F),]
+      
+      x_range <- min(max(abs(res$log2FoldChange),na.rm = TRUE),150)
+      y_range <- min(max(-log10(res$pvalue),na.rm = TRUE),150)
+      
+      par(mfrow=c(2,3))
+    
+      for(i in 1:6){
+        plotCounts(dds,
+                   gene=row.names(res)[i],
+                   intgroup="ToD")
+      }
+    
+      mtext(paste(GroupOI[1],"vs",GroupOI[2]), side = 3, line = -1.5, outer = TRUE)
+      
+      #reset par
+      par(mfrow=c(1,1))
+      # Make a basic volcano plot
+      with(res,
+           plot(log2FoldChange,
+                -log10(pvalue),
+                pch=20,
+                main=paste0(GroupOI[1]," vs ",GroupOI[2]," Volcano plot"),
+                ylim=c(0,y_range),
+                xlim=c(-x_range,x_range)))
+      
+      # Add colored points: blue if padj<0.01, red if log2FC>1 and padj<0.05)
+      with(subset(res,
+                  padj<pAdj_thresh ),
+           points(log2FoldChange,-log10(pvalue),
+                  pch=20,
+                  col="blue"))
+      
+      with(subset(res,
+                  padj<pAdj_thresh & abs(log2FoldChange)>1 & !is.na(padj<pAdj_thresh)),
+           points(log2FoldChange, -log10(pvalue),
+                  pch=20,
+                  col="red"))
+      
+      res$colorGroup <- "insig"
+      res$colorGroup[res$padj < pAdj_thresh &
+                             !is.na(res$padj<pAdj_thresh)] <- "sig"
+      
+      res$colorGroup[res$padj < pAdj_thresh &
+                             !is.na(res$padj<pAdj_thresh) &
+                             abs(res$log2FoldChange) >1] <- "sigLarge"
+      
+      res$ToD1 <- GroupOI[1]
+      res$ToD2 <- GroupOI[2]
+      
+      if(n == 1){
+       dfOut <- res
+      }else{
+       dfOut <- rbind(dfOut,res)
+      }
+      
+      print(paste("Run",n,"finished.",round(difftime(Sys.time(),time1,units = "hour"),2),"hours have elapsed"))
+      n <- n+1
+    }
+  }
+}
+
+DE_plot <- ggplot(dfOut[!is.na(dfOut$padj),])+
+  geom_vline(xintercept = c(-1,1))+
+  geom_point(aes(x = log2FoldChange,
+                 y = -log(pvalue,10),
+                 color = colorGroup))+
+  facet_rep_grid(factor(ToD1, levels = c("morning","afternoon","evening")) ~ factor(ToD2,levels = c("afternoon","evening","night")))+
+  scale_color_manual(values = c("insig" = "black",
+                                "sig" = "blue",
+                                "sigLarge" = "red"))+
+  theme_classic(base_size = 12)+
+  theme(legend.title=element_blank(),
+        legend.position = "right",
+        legend.key.size = unit(1.5, "cm"),
+        axis.text = element_text(colour = "black"),
+        axis.ticks = element_line(colour = "black"),
+        panel.border = element_rect(linewidth = 1,
+                                    colour = "black",
+                                    fill = NA),
+        strip.background.x =  element_rect(colour = NA,
+                                           fill = NA),
+        strip.text.x = element_text(face = "bold",
+                                    size = 20),
+        strip.text.y = element_text(face = "bold",
+                                    size = 15))
+
+ggsave(filename = "DE_plots/PairWise_DE.png",plot = DE_plot,dpi = 300,height = 9,width = 12)
+```
 
 ```{r pressure, echo=FALSE}
 # Now we’re ready to run DESEQ function ---------------------------------------
