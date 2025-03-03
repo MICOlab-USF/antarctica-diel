@@ -62,7 +62,7 @@ When you click the **Knit** button a document will be generated that includes bo
 ```{r, Data setup}
 
 # Input_data <- Bact.Sub
-Input_data <- rbind(Euk.Sub,Bact.Sub)
+Input_data <- rbind(Euk.Sub,Prok.Sub)
 
 for(i in 1:nrow(Input_data)){
   if(i == 1){
@@ -176,12 +176,14 @@ if(AvgDays == TRUE){
   filter <- c("SequenceID",df_meta$SampleID[df_meta$ToD %in% GroupOI]) 
 }
 
+TaxFilter <- Input_data$Domain == "Archaea"
+
 if(Day_toggle == "ToD"){
-  dds <- DESeqDataSetFromMatrix(countData=countData[,filter],
+  dds <- DESeqDataSetFromMatrix(countData=countData[TaxFilter,filter],
                               colData=df_meta[df_meta$ToD %in% GroupOI,], 
                               design=~ToD, tidy = TRUE)
 } else if(Day_toggle == "Day.num"){
-  dds <- DESeqDataSetFromMatrix(countData=countData[,filter],
+  dds <- DESeqDataSetFromMatrix(countData=countData[TaxFilter,filter],
                               colData=df_meta[df_meta$ToD %in% GroupOI,], 
                               design=~Day.num, tidy = TRUE)
 }
@@ -208,7 +210,7 @@ ggplot(pcaData, aes(PC1, PC2, color=Day.num, shape=ToD)) +
   scale_colour_brewer(type="qual", palette="Dark2")+
   theme_classic()
 
-# ggsave("DE_plots/AllContigs_PCA.png",dpi = 300,width = 8,height = 6)
+# ggsave("DE_plots/AnnotatedContigs_PCA.png",dpi = 300,width = 8,height = 6)
 ```
 
 ```{r pressure, echo=FALSE}

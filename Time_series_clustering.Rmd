@@ -28,16 +28,16 @@ if(!all(bioc.packages %in% installed.packages()[,"Package"])){
 BiocManager::install(bioc.packages[!(bioc.packages %in% installed.packages()[,"Package"])])
 }
 
-library(dplyr)
+library(Rmisc)
 library(tidyverse)
 library(ggplot2)
 library(lemon)
 library(vegan)
-library(Rmisc)
 library(lubridate)
 library(RColorBrewer)
 library(pheatmap)
 library(ggh4x)
+library(dplyr)
 
 library(phyloseq)
 library(patchwork)
@@ -558,7 +558,7 @@ if(p_adj == TRUE){
 # file.name <- "Time_series_plots/UntagledTC_AllContigs.png"
 # ggsave(plot = p1,filename = file.name,dpi = 300,width = 15,height = 12)
 
-save(dfOut,df_meta,file = "CSV_files/rainResults_RegSpace.RData")
+# save(dfOut,df_meta,file = "CSV_files/rainResults_RegSpace.RData")
 
 Sys.time()-Time1
 ```
@@ -618,7 +618,7 @@ p1 <- ggplot(dfOut_long)+
 #     n_KEGG <- length(unlist(strsplit(Full.merged$KEGG_ko[i],",",fixed = TRUE)))
 #   }
 #   m_KEGG <- length(unlist(strsplit(Full.merged$KEGG_ko[i],",",fixed = TRUE)))
-#   
+# 
 #   if(m_KEGG > n_KEGG){
 #     n_KEGG <- m_KEGG
 #   }
@@ -637,10 +637,10 @@ p1 <- ggplot(dfOut_long)+
 # Full.merged$K1_paths <- unlist(lapply(Full.merged$KEGG1,
 #                                       function(x){ifelse(x == "-","",KO_paths$ko[KO_paths$K1 == x])}))
 # 
-# names(Full.merged) <- unlist(lapply(names(Full.merged),
-#                                  function(x){unlist(strsplit(x,split = "_",fixed = TRUE))[1]}))
+# names(Full.merged)[grep("quant",names(Full.merged))] <- unlist(lapply(names(Full.merged)[grep("quant",names(Full.merged))],
+#                                                                       function(x){unlist(strsplit(x,split = "_",fixed = TRUE))[1]}))
 # 
-# column.drop_list <- c(meta.data$SampleID,"counts","max","full","Unnamed..0","X","KEGG")
+# column.drop_list <- c(meta.data$SampleID,"counts","max_pid","full_classification","Unnamed..0","X")
 # 
 # Full.merged <- Full.merged[,!(names(Full.merged) %in% column.drop_list)]
 # names(Full.merged)[names(Full.merged) == "SequenceID"] <- "ID"
@@ -672,6 +672,7 @@ Full.merged_rain[Full.merged_rain$TaxFunc == "Yes",2:9] <- Full.merged_rain[Full
 dfOut_long <- pivot_longer(Full.merged_rain[vec,],cols = 2:9,names_to = "ToD",values_to = "TPM")
 
 Time_vec <- c(0,6,12,18,24,30,36,42)
+phase_list <- c("Morning","Afternoon","Evening","Night")
 
 p1 <- ggplot(dfOut_long)+
   geom_line(aes(x = as.numeric(ToD),
@@ -704,7 +705,71 @@ p1
 ```{r}
 load("CSV_files/FullMerged_rain.RData",verbose = T)
 
-vec <- sample(nrow(Full.merged_rain),1000000,replace = F)
+Full.merged_rain$phase.peaks <- paste(Full.merged_rain$phase,Full.merged_rain$peak.shape,sep = "+")
+phase.peaks <- factor(unique(Full.merged_rain$phase.peaks),
+                      levels = c("Morning+6","Morning+12","Morning+18",
+                                 "Afternoon+6","Afternoon+12","Afternoon+18",
+                                 "Evening+6","Evening+12","Evening+18",
+                                 "Night+6","Night+12","Night+18"))
+
+for(i in 1:length(phase.peaks)){
+  if(i == 1){
+    vec.sig <- rep(NA,length(phase.peaks))
+    vec.insig <- rep(NA,length(phase.peaks))
+  }
+  
+  filter <- Full.merged_rain$phase.peaks == phase.peaks[i]
+  
+  df.temp <- Full.merged_rain[filter,]
+  
+  vec.sig[i] <- sum(df.temp$Sig == "Sig")
+  vec.insig[i] <- sum(df.temp$Sig == "Insig")
+  
+  if(i == length(phase.peaks)){
+    dfOut <- cbind.data.frame(phase.peaks,"Sig" = vec.sig,"Insig" = vec.insig)
+  }
+}
+
+axis2.Scale <- 200000/10e5
+
+ggplot()+
+  geom_bar(data = dfOut%>%pivot_longer(cols = 2:3,
+                                       names_to = "Sig",
+                                       values_to = "Value"),
+           aes(x = phase.peaks,
+               y = Value/10e5,
+               fill = Sig),
+           position = "stack",stat = "identity")+
+  geom_point(data = dfOut,
+             aes(x = phase.peaks,
+                 y = (Sig/(Sig+Insig))*axis2.Scale*100))+
+  scale_y_continuous(sec.axis = sec_axis(~./axis2.Scale, name = "% Significant"))+
+  scale_fill_manual(values = c("Sig" = "dodgerblue",
+                               "Insig" = "goldenrod"))+
+  theme_classic()
+
+# dfOut$Sig.scaled <- dfOut$Sig/(dfOut$Sig+dfOut$Insig)
+# dfOut$Insig.scaled <- dfOut$Insig/(dfOut$Sig+dfOut$Insig)
+# 
+# ggplot(dfOut %>% pivot_longer(cols = 4:5,
+#                               names_to = "Sig.scaled",
+#                               values_to = "Value"))+
+#   geom_bar(aes(x = phase.peaks,
+#                y = Value,
+#                fill = Sig.scaled),
+#            position = "stack",stat = "identity")+
+#   scale_fill_manual(values = c("Sig.scaled" = "dodgerblue",
+#                                "Insig.scaled" = "goldenrod"))+
+#   theme_classic()
+
+```
+
+
+
+```{r}
+load("CSV_files/FullMerged_rain.RData",verbose = T)
+
+vec <- sample(nrow(Full.merged_rain),10000,replace = F)
 
 # dfOut <- Full.merged_rain[vec,"KEGG1"]
 # row.names(dfOut) <- Full.merged_rain$ID[vec]

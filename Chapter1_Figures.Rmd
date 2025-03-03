@@ -1,0 +1,711 @@
+---
+title: "Chapter1_figures"
+author: "Andreas Norlin"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+rm(list = ls())
+
+package.list <- c("dplyr","tidyverse","ggplot2",
+                  "lemon","vegan","Rmisc",
+                  "lubridate","patchwork","stringi",
+                  "RColorBrewer","pheatmap","ggh4x")
+
+if(!all(package.list %in% installed.packages()[,"Package"])){
+  install.packages(package.list[!(package.list %in% installed.packages()[,"Package"])])
+}
+
+bioc.packages <- c("phyloseq","DESeq2","rain","limma","clusterProfiler")
+
+if(!all(bioc.packages %in% installed.packages()[,"Package"])){
+  if (!require("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+
+BiocManager::install(bioc.packages[!(bioc.packages %in% installed.packages()[,"Package"])])
+}
+
+library(dplyr)
+library(tidyverse)
+library(ggplot2)
+library(lemon)
+library(vegan)
+library(Rmisc)
+library(lubridate)
+library(RColorBrewer)
+library(pheatmap)
+library(ggh4x)
+
+library(phyloseq)
+library(patchwork)
+library(DESeq2)
+library(stringi)
+
+library(rain)
+library(limma)
+library(clusterProfiler)
+
+colors=c('#e9e9e9','#C14450','#f0b08f','#c2aba6','#60555f','#3c6481','#9fd6e6','#256F64','#63a375')
+
+red<- c("#EB8B8E","#FBD5E2","#E7B6AF","#AC6873", "#D82354","darkred")
+orange <- c("#FAAA6D","#FECF92")
+yellow <- c("#FFC317","#F7F4B7", "#CC9C3C")
+green <- c("#16866F","#1E3F1C","#99A339","#516A65","#8BC89F","darkgreen")
+blue <- c("#005694","#B7E1DD","#66879E","#1BAAE2","#5FC8D8","darkblue")
+purple <- c("#E7D7CE","#A699A9","#434582","#81347D", "#B5218E")
+
+colors30 <- c(blue, purple, red, yellow, orange, green, "black")
+
+plot.width <- 10
+plot.height <- 6
+
+save_plots <- TRUE
+```
+
+## Distribution plots:
+
+This section is for creating distribution plots, like bar plots and pie charts
+
+```{r}
+# load("CSV_files/Full.merged.RData",verbose = T)
+# salmon.numreads <- read.csv("CSV_files/salmon.merged.TPM.subset5.csv")
+# 
+# names(Full.merged) <- unlist(lapply(names(Full.merged),
+#                                     function(x){unlist(strsplit(x,
+#                                                                 split = "_",
+#                                                                 fixed = TRUE))[1]}))
+# 
+# filter <- names(Full.merged) %in% names(salmon.numreads)
+# 
+# Full.merged <- Full.merged[,!filter]
+# 
+# Full.merged <- merge(salmon.numreads,Full.merged,
+#                      by.x = "Name",by.y = "SequenceID",
+#                      all.x = TRUE)
+# 
+# TPM.TaxFunc <- Full.merged
+# 
+# save(TPM.TaxFunc,meta.data,file = "CSV_files/TPM_TaxFunc.RData")
+# 
+# rm(list = c("salmon.numreads","filter"))
+```
+
+```{r}
+load("CSV_files/TPM_TaxFunc.RData",verbose = T)
+
+
+```
+
+## Taxonomic annotation of contigs:
+
+The following plot shows how many contigs has been annotated to the specific taxonomical level.
+
+```{r}
+TaxHierach <- c("Domain","Supergroup","Division","Class","Order","Family","Genus","Species")
+
+# for(i in 1:length(TaxHierach)){
+#   if(i == 1){
+#     vec <- rep(NA,length(TaxHierach))
+#   }
+# 
+# 
+# 
+#   vec[i] <- (sum(!is.na(TPM.TaxFunc[,TaxHierach[i]]))/nrow(TPM.TaxFunc))*100
+# }
+
+for(i in 1:length(TaxHierach)){
+  if(i == 1){
+    vec <- rep(NA,length(TaxHierach))
+  }
+  
+  filter <- !is.na(TPM.TaxFunc[,TaxHierach[i]])
+  
+  vec[i] <- (sum(TPM.TaxFunc[filter,paste(meta.data$SampleID,"quant",sep = "_")])/sum(TPM.TaxFunc[,paste(meta.data$SampleID,"quant",sep = "_")]))*100
+}
+
+dfOut <- cbind.data.frame("fill" = TaxHierach,"Annotated" = vec,"Unannotated" = 100-vec) %>% 
+  pivot_longer(cols = c(2,3),names_to = "Annot",values_to = "values")
+
+ggplot(dfOut)+
+  geom_bar(aes(fill=Annot,
+               x = factor(fill,levels = TaxHierach),
+               y = values),
+           position = "stack",
+           stat = "identity")+
+  geom_point(data = dfOut[dfOut$Annot == "Annotated",],
+             aes(x = fill,
+                 y = values*50,
+                 color = Annot))+
+  scale_y_continuous(breaks = c(0,20,40,60,80,100),
+                     sec.axis = sec_axis(~./50, name = "% Annotated"))+
+  scale_fill_manual(values = c("Annotated" = "dodgerblue",
+                               "Unannotated" = "grey"))+
+  scale_color_manual(values = c("Annotated" = "black"))+
+  labs(x = "Taxonomic level",
+       y = "% of normalized reads",
+       title = "Annotated contigs to specific taxonomical level",
+       caption = "The dots indicate the percentage of contigs that are\n annotated at that level, plotted on the seconday y-axis",)+
+  theme_classic()
+
+if(save_plots){
+  ggsave("Chapter1_plots/TPM_annotatedTaxBar.png",dpi = 300,height = plot.height,width = plot.width)
+}
+```
+It might not be very apparent, but less than 1.5% of all the reads have been assigned to a Domain, and the sharp decline occurs at class.
+
+## Distributions at taxonomic levels:
+
+```{r}
+load("CSV_files/Full.merged.RData",verbose = T)
+source("summary_count.R")
+
+# Removing NAs from the Division column, by renaming them as resolved, and whatever their highest resolved taxonomy is.
+na.filter <- is.na(Full.merged$Division)
+Full.merged$Division[na.filter] <- paste("Unresolved",Full.merged$classification[na.filter],sep = "_")
+
+names(Full.merged) <- unlist(lapply(names(Full.merged),function(x){unlist(strsplit(x,split = "_"))[1]}))
+
+# Setting up the summary count function and running it.
+day.vec <- meta.data$SampleID
+df.count <- summary_count(Full.merged,Col_vec = day.vec,Col_filter = "Division")
+
+# Finding all the groups that appear in top n at least once.
+n.top <- 10
+
+for(i in 1:ncol(df.count)){
+  if(i == 1){
+    name.vec <- names(df.count)
+  }
+  
+  vec <- row.names(df.count)[order(df.count[,name.vec[i]],decreasing = T)[1:n.top]]
+  
+  if(i == 1){
+    top.Div <- vec
+  } else{
+    if(all(vec %in% top.Div)){
+      
+    }else{
+     top.Div <- c(top.Div,vec[!(vec %in% top.Div)]) 
+    }
+  }
+}
+
+top_filter <- row.names(df.count) %in% top.Div
+
+df.count <- data.frame(apply(df.count,2,function(x){x/sum(x)}))
+
+df.count$Division <- row.names(df.count)
+df.count$Division[!top_filter] <- "other"
+
+meta.data$Replicate <- unlist(lapply(meta.data$SampleName,function(x){substr(x,start = nchar(x),stop = nchar(x))}))
+
+dfOut <- pivot_longer(df.count,cols = all_of(day.vec),names_to = "SampleID",values_to = "TPM")
+dfOut <- merge(dfOut,meta.data[,c("SampleID","SampleName","AssemblyGroup","Day.num","ToD","Replicate")],by = "SampleID")
+
+for(i in 1:length(top.Div)){
+  if(i == 1){
+    vec <- rep(NA,length(top.Div))
+    vec.color <- rep(NA,length(top.Div))
+    
+    n <- 1
+    m <- 1
+  }
+  
+  vec[i] <- unique(Full.merged$Domain[Full.merged$Division %in% top.Div[i]])
+  
+  if(vec[i] =="Bacteria"){
+    vec.color[i] <- yellow[n]
+    
+    n <- n+1
+  } else{
+    vec.color[i] <- c(blue,green,red)[m]
+    m <- m+1
+  }
+  
+  if(i == length(top.Div)){
+    div.colors <- c(vec.color,"grey")
+    
+    names(div.colors) <- c(top.Div,"other")
+  }
+}
+
+order.vec1 <- c("Day1_afternoon","Day1_evening","Day1_night","Day1_morning",
+               "Day2_night","Day2_morning","Day2_afternoon","Day2_evening")
+
+labels.vec1 <- c("Afternoon","Evening","Night","Morning",
+                 "Night ","Morning ","Afternoon ","Evening ")
+
+order.vec2 <- c("Day1_morning","Day1_afternoon","Day1_evening","Day1_night",
+               "Day2_morning","Day2_afternoon","Day2_evening","Day2_night")
+
+labels.vec2 <- c("Morning","Afternoon","Evening","Night",
+                 "Morning ","Afternoon ","Evening ","Night ")
+
+dfOut$AssemblyGroup <- factor(dfOut$AssemblyGroup,
+                              levels = order.vec1,
+                              labels = labels.vec1)
+
+ggplot(dfOut) +
+    geom_bar(aes(fill = factor(Division, levels = c(top.Div, "other")),
+                 x = Replicate,
+                 y = TPM),
+             position = "stack", stat = "identity") +
+    facet_nested(~factor(Day.num,levels = c("Day1","Day2"),labels = c("Day 1", "Day 2"))+
+                   AssemblyGroup) +
+    theme_classic()+
+  labs(x = "Sample",
+       y = "Fraction of annotated TPM",
+       title = "Top Division represented",
+       fill = "Division")+
+  scale_fill_manual(values = div.colors)+
+  theme(axis.text.x = element_blank())
+
+if(save_plots){
+  ggsave("Chapter1_plots/TPM_DivisionBars.png",dpi = 300,height = plot.height,width = plot.width)
+}
+```
+
+```{r}
+load("CSV_files/Full.merged.RData",verbose = T)
+source("summary_count.R")
+
+# Removing NAs from the Class column, by renaming them as resolved, and whatever their highest resolved taxonomy is.
+na.filter <- is.na(Full.merged$Class)
+Full.merged$Class[na.filter] <- paste("Unresolved",Full.merged$classification[na.filter],sep = "_")
+
+names(Full.merged) <- unlist(lapply(names(Full.merged),function(x){unlist(strsplit(x,split = "_"))[1]}))
+
+# Setting up the summary count function and running it.
+day.vec <- meta.data$SampleID
+df.count <- summary_count(Full.merged,Col_vec = day.vec,Col_filter = "Class")
+
+# Finding all the groups that appear in top n at least once.
+n.top <- 10
+
+for(i in 1:ncol(df.count)){
+  if(i == 1){
+    name.vec <- names(df.count)
+  }
+  
+  vec <- row.names(df.count)[order(df.count[,name.vec[i]],decreasing = T)[1:n.top]]
+  
+  if(i == 1){
+    top.Div <- vec
+  } else{
+    if(all(vec %in% top.Div)){
+      
+    }else{
+     top.Div <- c(top.Div,vec[!(vec %in% top.Div)]) 
+    }
+  }
+}
+
+top_filter <- row.names(df.count) %in% top.Div
+
+df.count <- data.frame(apply(df.count,2,function(x){x/sum(x)}))
+
+df.count$Class <- row.names(df.count)
+df.count$Class[!top_filter] <- "other"
+
+meta.data$Replicate <- unlist(lapply(meta.data$SampleName,function(x){substr(x,start = nchar(x),stop = nchar(x))}))
+
+dfOut <- pivot_longer(df.count,cols = all_of(day.vec),names_to = "SampleID",values_to = "TPM")
+dfOut <- merge(dfOut,meta.data[,c("SampleID","SampleName","AssemblyGroup","Day.num","ToD","Replicate")],by = "SampleID")
+
+for(i in 1:length(top.Div)){
+  if(i == 1){
+    vec <- rep(NA,length(top.Div))
+    vec.color <- rep(NA,length(top.Div))
+    
+    n <- 1
+    m <- 1
+  }
+  
+  vec[i] <- unique(Full.merged$Domain[Full.merged$Class %in% top.Div[i]])
+  
+  if(vec[i] =="Bacteria"){
+    vec.color[i] <- yellow[n]
+    
+    n <- n+1
+  } else{
+    vec.color[i] <- c(blue,green,red)[m]
+    m <- m+1
+  }
+  
+  if(i == length(top.Div)){
+    div.colors <- c(vec.color,"grey")
+    
+    names(div.colors) <- c(top.Div,"other")
+  }
+}
+
+order.vec1 <- c("Day1_afternoon","Day1_evening","Day1_night","Day1_morning",
+               "Day2_night","Day2_morning","Day2_afternoon","Day2_evening")
+
+labels.vec1 <- c("Afternoon","Evening","Night","Morning",
+                 "Night ","Morning ","Afternoon ","Evening ")
+
+order.vec2 <- c("Day1_morning","Day1_afternoon","Day1_evening","Day1_night",
+               "Day2_morning","Day2_afternoon","Day2_evening","Day2_night")
+
+labels.vec2 <- c("Morning","Afternoon","Evening","Night",
+                 "Morning ","Afternoon ","Evening ","Night ")
+
+dfOut$AssemblyGroup <- factor(dfOut$AssemblyGroup,
+                              levels = order.vec1,
+                              labels = labels.vec1)
+
+ggplot(dfOut) +
+    geom_bar(aes(fill = factor(Class, levels = c(top.Div, "other")),
+                 x = Replicate,
+                 y = TPM),
+             position = "stack", stat = "identity") +
+    facet_nested(~factor(Day.num,levels = c("Day1","Day2"),labels = c("Day 1", "Day 2"))+
+                   AssemblyGroup) +
+    theme_classic()+
+  labs(x = "Sample",
+       y = "Fraction of annotated TPM",
+       title = "Top Classes represented",
+       fill = "Class")+
+  scale_fill_manual(values = div.colors)+
+  theme(axis.text.x = element_blank())
+
+if(save_plots){
+  ggsave("Chapter1_plots/TPM_ClassBars.png",dpi = 300,height = plot.height,width = plot.width)
+}
+```
+
+```{r}
+load("CSV_files/Full.merged.RData",verbose = T)
+source("summary_count.R")
+
+# Removing NAs from the Genus column, by renaming them as resolved, and whatever their highest resolved taxonomy is.
+na.filter <- is.na(Full.merged$Genus)
+Full.merged$Genus[na.filter] <- paste("Unresolved",Full.merged$classification[na.filter],sep = " ")
+
+names(Full.merged)[grep("HM",names(Full.merged))] <- unlist(lapply(names(Full.merged)[grep("HM",names(Full.merged))],
+                                                                   function(x){unlist(strsplit(x,split = "_"))[1]}))
+
+Full.merged$Genus[Full.merged$Genus == "Uncertain"] <- paste("Uncertain",Full.merged$Family[Full.merged$Genus == "Uncertain"],sep = " ")
+
+# Setting up the summary count function and running it.
+day.vec <- meta.data$SampleID
+df.count <- summary_count(Full.merged,Col_vec = day.vec,Col_filter = "Genus")
+
+# Finding all the groups that appear in top n at least once.
+n.top <- 10
+
+for(i in 1:ncol(df.count)){
+  if(i == 1){
+    name.vec <- names(df.count)
+  }
+  
+  vec <- row.names(df.count)[order(df.count[,name.vec[i]],decreasing = T)[1:n.top]]
+  
+  if(i == 1){
+    top.Div <- vec
+  } else{
+    if(all(vec %in% top.Div)){
+      
+    }else{
+     top.Div <- c(top.Div,vec[!(vec %in% top.Div)]) 
+    }
+  }
+}
+
+top_filter <- row.names(df.count) %in% top.Div
+
+df.count <- data.frame(apply(df.count,2,function(x){x/sum(x)}))
+
+df.count$Genus <- row.names(df.count)
+df.count$Genus[!top_filter] <- "other"
+
+meta.data$Replicate <- unlist(lapply(meta.data$SampleName,function(x){substr(x,start = nchar(x),stop = nchar(x))}))
+
+dfOut <- pivot_longer(df.count,cols = all_of(day.vec),names_to = "SampleID",values_to = "TPM")
+dfOut <- merge(dfOut,meta.data[,c("SampleID","SampleName","AssemblyGroup","Day.num","ToD","Replicate")],by = "SampleID")
+
+for(i in 1:length(top.Div)){
+  if(i == 1){
+    vec <- rep(NA,length(top.Div))
+    vec.color <- rep(NA,length(top.Div))
+    
+    n <- 1
+    m <- 1
+  }
+  
+  vec[i] <- unique(Full.merged$Domain[Full.merged$Genus %in% top.Div[i]])
+  
+  if(vec[i] =="Bacteria"){
+    vec.color[i] <- yellow[n]
+    
+    n <- n+1
+  } else{
+    vec.color[i] <- c(blue,green,red)[m]
+    m <- m+1
+  }
+  
+  if(i == length(top.Div)){
+    div.colors <- c(vec.color,"grey")
+    
+    names(div.colors) <- c(top.Div,"other")
+  }
+}
+
+order.vec1 <- c("Day1_afternoon","Day1_evening","Day1_night","Day1_morning",
+               "Day2_night","Day2_morning","Day2_afternoon","Day2_evening")
+
+labels.vec1 <- c("Afternoon","Evening","Night","Morning",
+                 "Night ","Morning ","Afternoon ","Evening ")
+
+order.vec2 <- c("Day1_morning","Day1_afternoon","Day1_evening","Day1_night",
+               "Day2_morning","Day2_afternoon","Day2_evening","Day2_night")
+
+labels.vec2 <- c("Morning","Afternoon","Evening","Night",
+                 "Morning ","Afternoon ","Evening ","Night ")
+
+dfOut$AssemblyGroup <- factor(dfOut$AssemblyGroup,
+                              levels = order.vec1,
+                              labels = labels.vec1)
+
+Uncertain.vec <- top.Div[grep(c("Uncertain"),top.Div)]
+Unresolved.vec <- top.Div[grep(c("Unresolved"),top.Div)]
+top.Div <- c(top.Div[!(top.Div %in% c(Uncertain.vec,Unresolved.vec))],Uncertain.vec,Unresolved.vec)
+
+ggplot(dfOut) +
+    geom_bar(aes(fill = factor(Genus, levels = c(top.Div, "other")),
+                 x = Replicate,
+                 y = TPM),
+             position = "stack", stat = "identity") +
+    facet_nested(~factor(Day.num,levels = c("Day1","Day2"),labels = c("Day 1", "Day 2"))+
+                   AssemblyGroup) +
+    theme_classic()+
+  labs(x = "Sample",
+       y = "Fraction of annotated TPM",
+       title = "Top Genus represented",
+       fill = "Genus")+
+  scale_fill_manual(values = div.colors)+
+  theme(axis.text.x = element_blank())
+
+if(save_plots){
+  ggsave("Chapter1_plots/TPM_GenusBars.png",dpi = 300,height = plot.height,width = plot.width)
+}
+```
+
+
+```{r}
+load("CSV_files/Full.merged.RData",verbose = T)
+source("summary_count.R")
+
+# Removing NAs from the Species column, by renaming them as resolved, and whatever their highest resolved taxonomy is.
+na.filter <- is.na(Full.merged$Species)
+Full.merged$Species[na.filter] <- paste("Unresolved",Full.merged$classification[na.filter],sep = " ")
+
+names(Full.merged)[grep("HM",names(Full.merged))] <- unlist(lapply(names(Full.merged)[grep("HM",names(Full.merged))],
+                                                                   function(x){unlist(strsplit(x,split = "_"))[1]}))
+
+Full.merged$Species[Full.merged$classification == "Uncertain"] <- paste("Uncertain",Full.merged$Genus[Full.merged$classification == "Uncertain"],sep = " ")
+Full.merged$Species[Full.merged$Species == "Uncertain Uncertain"] <- paste("Uncertain",Full.merged$Family[Full.merged$Species == "Uncertain Uncertain"],sep = " ")
+
+# Setting up the summary count function and running it.
+day.vec <- meta.data$SampleID
+df.count <- summary_count(Full.merged,Col_vec = day.vec,Col_filter = "Species")
+
+# Finding all the groups that appear in top n at least once.
+n.top <- 10
+
+for(i in 1:ncol(df.count)){
+  if(i == 1){
+    name.vec <- names(df.count)
+  }
+  
+  vec <- row.names(df.count)[order(df.count[,name.vec[i]],decreasing = T)[1:n.top]]
+  
+  if(i == 1){
+    top.Div <- vec
+  } else{
+    if(all(vec %in% top.Div)){
+      
+    }else{
+     top.Div <- c(top.Div,vec[!(vec %in% top.Div)]) 
+    }
+  }
+}
+
+top_filter <- row.names(df.count) %in% top.Div
+
+df.count <- data.frame(apply(df.count,2,function(x){x/sum(x)}))
+
+df.count$Species <- row.names(df.count)
+df.count$Species[!top_filter] <- "other"
+
+meta.data$Replicate <- unlist(lapply(meta.data$SampleName,function(x){substr(x,start = nchar(x),stop = nchar(x))}))
+
+dfOut <- pivot_longer(df.count,cols = all_of(day.vec),names_to = "SampleID",values_to = "TPM")
+dfOut <- merge(dfOut,meta.data[,c("SampleID","SampleName","AssemblyGroup","Day.num","ToD","Replicate")],by = "SampleID")
+
+for(i in 1:length(top.Div)){
+  if(i == 1){
+    vec <- rep(NA,length(top.Div))
+    vec.color <- rep(NA,length(top.Div))
+    
+    n <- 1
+    m <- 1
+  }
+  
+  vec[i] <- unique(Full.merged$Domain[Full.merged$Species %in% top.Div[i]])
+  
+  if(vec[i] =="Bacteria"){
+    vec.color[i] <- yellow[n]
+    
+    n <- n+1
+  } else{
+    vec.color[i] <- c(blue,green,red)[m]
+    m <- m+1
+  }
+  
+  if(i == length(top.Div)){
+    div.colors <- c(vec.color,"grey")
+    
+    names(div.colors) <- c(top.Div,"other")
+  }
+}
+
+order.vec1 <- c("Day1_afternoon","Day1_evening","Day1_night","Day1_morning",
+               "Day2_night","Day2_morning","Day2_afternoon","Day2_evening")
+
+labels.vec1 <- c("Afternoon","Evening","Night","Morning",
+                 "Night ","Morning ","Afternoon ","Evening ")
+
+order.vec2 <- c("Day1_morning","Day1_afternoon","Day1_evening","Day1_night",
+               "Day2_morning","Day2_afternoon","Day2_evening","Day2_night")
+
+labels.vec2 <- c("Morning","Afternoon","Evening","Night",
+                 "Morning ","Afternoon ","Evening ","Night ")
+
+dfOut$AssemblyGroup <- factor(dfOut$AssemblyGroup,
+                              levels = order.vec1,
+                              labels = labels.vec1)
+
+Uncertain.vec <- top.Div[grep(c("Uncertain"),top.Div)]
+Unresolved.vec <- top.Div[grep(c("Unresolved"),top.Div)]
+top.Div <- c(top.Div[!(top.Div %in% c(Uncertain.vec,Unresolved.vec))],Uncertain.vec,Unresolved.vec)
+
+ggplot(dfOut) +
+    geom_bar(aes(fill = factor(Species, levels = c(top.Div, "other")),
+                 x = Replicate,
+                 y = TPM),
+             position = "stack", stat = "identity") +
+    facet_nested(~factor(Day.num,levels = c("Day1","Day2"),labels = c("Day 1", "Day 2"))+
+                   AssemblyGroup) +
+    theme_classic()+
+  labs(x = "Sample",
+       y = "Fraction of annotated TPM",
+       title = "Top Species represented",
+       fill = "Species")+
+  scale_fill_manual(values = div.colors)+
+  theme(axis.text.x = element_blank())
+
+if(save_plots){
+  ggsave("Chapter1_plots/TPM_SpeciesBars.png",dpi = 300,height = plot.height,width = plot.width)
+}
+```
+
+## Time series figures:
+First figure here shows the distribution of cycles that was found, including how many at each cycle patter was significant and insignificant.
+
+```{r}
+load("CSV_files/FullMerged_rain.RData",verbose = T)
+
+Full.merged_rain$phase.peaks <- paste(Full.merged_rain$phase,Full.merged_rain$peak.shape,sep = "+")
+phase.peaks <- factor(unique(Full.merged_rain$phase.peaks),
+                      levels = c("Morning+6","Morning+12","Morning+18",
+                                 "Afternoon+6","Afternoon+12","Afternoon+18",
+                                 "Evening+6","Evening+12","Evening+18",
+                                 "Night+6","Night+12","Night+18"))
+
+for(i in 1:length(phase.peaks)){
+  if(i == 1){
+    vec.sig <- rep(NA,length(phase.peaks))
+    vec.insig <- rep(NA,length(phase.peaks))
+  }
+  
+  filter <- Full.merged_rain$phase.peaks == phase.peaks[i]
+  
+  df.temp <- Full.merged_rain[filter,]
+  
+  vec.sig[i] <- sum(df.temp$Sig == "Sig")
+  vec.insig[i] <- sum(df.temp$Sig == "Insig")
+  
+  if(i == length(phase.peaks)){
+    dfOut <- cbind.data.frame(phase.peaks,"Sig" = vec.sig,"Insig" = vec.insig)
+  }
+}
+
+axis2.Scale <- 200000/10e5
+
+ggplot()+
+  geom_bar(data = dfOut%>%pivot_longer(cols = 2:3,
+                                       names_to = "Sig",
+                                       values_to = "Value"),
+           aes(x = phase.peaks,
+               y = Value/10e5,
+               fill = Sig),
+           position = "stack",stat = "identity")+
+  geom_point(data = dfOut,
+             aes(x = phase.peaks,
+                 y = (Sig/(Sig+Insig))*axis2.Scale*100))+
+  scale_y_continuous(sec.axis = sec_axis(~./axis2.Scale, name = "% Significant"))+
+  scale_fill_manual(values = c("Sig" = "dodgerblue",
+                               "Insig" = "goldenrod"))+
+  labs(x = "Peak phase + hours until valley",
+       y = "Occurences x 100,000",
+       fill = "Significance")+
+  theme_classic()
+
+if(save_plots){
+  ggsave("Chapter1_plots/TPM_RainSigBars.png",dpi = 300,height = plot.height,width = plot.width+2)
+}
+
+```
+
+
+```{r}
+# view(Full.merged[Full.merged$Class == "Unresolved_Haptophyta",])
+# 
+# view(Full.merged[Full.merged$Division == "Haptophyta",])
+# 
+# 
+# for(i in 1:length(top.Div)){
+#   if(i == 1){
+#     vec <- rep(NA,length(top.Div))
+#   }
+#   
+#   vec[i] <- unique(Full.merged$Domain[Full.merged$Division %in% top.Div[i]])
+# }
+
+
+dfOut$Facet_Combo <- factor(paste(dfOut$Day.num, dfOut$ToD, sep = "_"),
+                            levels = c("Day1_afternoon", "Day1_evening", "Day1_night", "Day1_morning",
+                                       "Day2_night", "Day2_morning", "Day2_afternoon", "Day2_evening"))
+
+ggplot(dfOut) +
+    geom_bar(aes(fill = factor(Class, levels = c(top.Div, "other")),
+                 x = Replicate,
+                 y = TPM),
+             position = "stack", stat = "identity") +
+    facet_nested(~factor(Day.num, levels = c("Day1", "Day2"), labels = c("Day 1", "Day 2")) + Facet_Combo, 
+                 scales = "free_x", space = "free_x") +
+    theme_classic() +
+    labs(x = "Sample",
+         y = "Fraction of annotated TPM",
+         title = "Top Species represented",
+         fill = "Species") +
+    scale_fill_manual(values = div.colors)+
+    theme(axis.text.x = element_blank())
+
+```
+

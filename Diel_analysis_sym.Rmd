@@ -456,8 +456,8 @@ p1 <- ggplot(dfOut2)+
 
 p1
 
-save_name <- "KO_plots/AllBact_topKO.png"
-ggsave(save_name,width = 10,height = 5,dpi = 300)
+# save_name <- "KO_plots/AllBact_topKO.png"
+# ggsave(save_name,width = 10,height = 5,dpi = 300)
 
 ```
 
