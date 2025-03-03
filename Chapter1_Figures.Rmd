@@ -645,14 +645,16 @@ for(i in 1:length(phase.peaks)){
   }
 }
 
-axis2.Scale <- 200000/10e5
+rm(list = "Full.merged_rain")
+
+axis2.Scale <- 200000/1e6
 
 ggplot()+
   geom_bar(data = dfOut%>%pivot_longer(cols = 2:3,
                                        names_to = "Sig",
                                        values_to = "Value"),
            aes(x = phase.peaks,
-               y = Value/10e5,
+               y = Value/1e6,
                fill = Sig),
            position = "stack",stat = "identity")+
   geom_point(data = dfOut,
@@ -662,7 +664,7 @@ ggplot()+
   scale_fill_manual(values = c("Sig" = "dodgerblue",
                                "Insig" = "goldenrod"))+
   labs(x = "Peak phase + hours until valley",
-       y = "Occurences x 100,000",
+       y = expression("Occurences x 10"^6),
        fill = "Significance")+
   theme_classic()
 

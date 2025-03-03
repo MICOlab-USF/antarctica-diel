@@ -730,14 +730,14 @@ for(i in 1:length(phase.peaks)){
   }
 }
 
-axis2.Scale <- 200000/10e5
+axis2.Scale <- 200000/1e6
 
 ggplot()+
   geom_bar(data = dfOut%>%pivot_longer(cols = 2:3,
                                        names_to = "Sig",
                                        values_to = "Value"),
            aes(x = phase.peaks,
-               y = Value/10e5,
+               y = Value/1e6,
                fill = Sig),
            position = "stack",stat = "identity")+
   geom_point(data = dfOut,
@@ -764,6 +764,113 @@ ggplot()+
 
 ```
 
+```{r}
+load("CSV_files/FullMerged_rain.RData",verbose = T)
+
+Full.merged_rain$phase.peaks <- paste(Full.merged_rain$phase,Full.merged_rain$peak.shape,sep = "+")
+phase.peaks <- factor(unique(Full.merged_rain$phase.peaks),
+                      levels = c("Morning+6","Morning+12","Morning+18",
+                                 "Afternoon+6","Afternoon+12","Afternoon+18",
+                                 "Evening+6","Evening+12","Evening+18",
+                                 "Night+6","Night+12","Night+18"))
+
+COG_categories <- sort(unique(unlist(lapply(unique(Full.merged_rain$COG_category),
+                                            function(x){strsplit(x,split = "")}))))
+
+Full.merged_rain$COG_category[is.na(Full.merged_rain$COG_category)] <- "na"
+
+COG_categories <- c(COG_categories,"na")
+
+for(i in 1:length(phase.peaks)){
+  if(i == 1){
+    df.sig <- data.frame(matrix(NA,nrow = length(phase.peaks),ncol = length(COG_categories)))
+    df.insig <- data.frame(matrix(NA,nrow = length(phase.peaks),ncol = length(COG_categories)))
+    
+    names(df.sig) <- COG_categories
+    df.sig$phase.peaks <- phase.peaks
+    
+    names(df.insig) <- COG_categories
+    df.insig$phase.peaks <- phase.peaks
+  }
+  
+  filter <- Full.merged_rain$phase.peaks == phase.peaks[i]
+  df.temp <- Full.merged_rain[filter,]
+  
+  for(j in 1:length(COG_categories)){
+    df.sig[i,j] <- length(grep(COG_categories[j],df.temp$COG_category[df.temp$Sig == "Sig"]))
+    df.insig[i,j] <- length(grep(COG_categories[j],df.temp$COG_category[df.temp$Sig == "Insig"]))
+  }
+  
+  if(i == length(phase.peaks)){
+    df.sig$Total <- apply(df.sig[,COG_categories],1,sum)
+    df.insig$Total <- apply(df.insig[,COG_categories],1,sum)
+    
+    df.sig$Sig <- "Sig"
+    df.insig$Sig <- "Insig"
+    
+    dfOut <- rbind.data.frame(df.sig,df.insig)
+    
+    rm(list = c("df.sig","df.insig","df.temp"))
+  }
+}
+dfOut$TotPhase <- apply(dfOut[,COG_categories],1,sum)
+
+dfOut2 <- dfOut %>% pivot_longer(cols = all_of(c(COG_categories,"TotPhase")),
+                                 names_to = "COG",
+                                 values_to = "Count")
+
+ggplot(dfOut2[dfOut2$COG %in% c("na","TotPhase"),])+
+  geom_bar(aes(fill = Sig,
+               x = COG,
+               y = Count),
+           position = "stack",stat = "identity")+
+  facet_wrap(facets = "phase.peaks", nrow = 4,ncol = 3)+
+  theme_classic()
+
+
+
+dfOut2$TotPhase.COG <- rep(dfOut2$Count[dfOut2$Sig == "Insig"] + dfOut2$Count[dfOut2$Sig == "Sig"],2)
+
+
+dfOut2 <- dfOut2[dfOut2$Sig == "Sig",]
+dfOut2$Sig.rat <- dfOut2$Count/dfOut2$TotPhase.COG
+dfOut2$ColorGroup <- NA
+
+for(i in 1:length(phase.peaks)){
+  filter <- dfOut2$phase.peaks == phase.peaks[i]
+  df.temp <- dfOut2[filter,]
+  
+  dfOut2$ColorGroup[filter] <- unlist(lapply(df.temp$Sig.rat,function(x){ifelse(x > df.temp$Sig.rat[df.temp$COG == "na"],
+                                                                              "Higher","Lower")}))
+  
+  if(i == length(phase.peaks)){
+    dfOut2$ColorGroup[dfOut2$COG == "na"] <- "unannotated"
+  }
+}
+
+# ggplot(dfOut2)+
+#   geom_point(aes(x = factor(COG,levels = c("na",COG_categories[COG_categories != "na"])),
+#                  y = Sig.rat,
+#                  color = ColorGroup),
+#              size = 2)+
+#   scale_color_manual(values = c("unannotated" = "black",
+#                                 "Higher" = "red",
+#                                 "Lower" = "blue"))+
+#   facet_wrap(facets = "phase.peaks", nrow = 4,ncol = 3)+
+#   theme_classic()
+
+ggplot(dfOut2)+
+  geom_bar(aes(x = factor(COG,levels = c("TotPhase","na",COG_categories[!(COG_categories %in% c("na","TotPhase"))])),
+               y = Sig.rat,
+               fill = ColorGroup),
+             position = "stack",stat = "identity")+
+  scale_fill_manual(values = c("unannotated" = "black",
+                                "Higher" = "red",
+                                "Lower" = "blue"))+
+  facet_wrap(facets = "phase.peaks", nrow = 4,ncol = 3)+
+  theme_classic()
+  
+```
 
 
 ```{r}
