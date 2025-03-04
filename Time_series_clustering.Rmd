@@ -49,18 +49,18 @@ library(limma)
 library(clusterProfiler)
 
 TPM <- TRUE
+```
+
+
+
+```{r, Data setup}
+TPM <- TRUE
 
 if(TPM == TRUE){
   load("CSV_files/Subsections.RData",verbose = TRUE)
 }else{
   load("CSV_files/Subsections_numreads.RData",verbose = TRUE)
 }
-
-```
-
-
-
-```{r, Data setup}
 
 Input_data <- Bact.Sub
 # Input_data <- rbind(Euk.Sub,Prok.Sub)
@@ -819,7 +819,7 @@ dfOut2 <- dfOut %>% pivot_longer(cols = all_of(c(COG_categories,"TotPhase")),
                                  names_to = "COG",
                                  values_to = "Count")
 
-ggplot(dfOut2[dfOut2$COG %in% c("na","TotPhase"),])+
+ggplot(dfOut2[!(dfOut2$COG %in% c("na","TotPhase")),])+
   geom_bar(aes(fill = Sig,
                x = COG,
                y = Count),
@@ -840,28 +840,29 @@ for(i in 1:length(phase.peaks)){
   filter <- dfOut2$phase.peaks == phase.peaks[i]
   df.temp <- dfOut2[filter,]
   
-  dfOut2$ColorGroup[filter] <- unlist(lapply(df.temp$Sig.rat,function(x){ifelse(x > df.temp$Sig.rat[df.temp$COG == "na"],
+  dfOut2$ColorGroup[filter] <- unlist(lapply(df.temp$Sig.rat,function(x){ifelse(x > df.temp$Sig.rat[df.temp$COG == "TotPhase"],
                                                                               "Higher","Lower")}))
   
   if(i == length(phase.peaks)){
     dfOut2$ColorGroup[dfOut2$COG == "na"] <- "unannotated"
+    dfOut2$ColorGroup[dfOut2$COG == "TotPhase"] <- "TotPhase"
   }
 }
 
-# ggplot(dfOut2)+
-#   geom_point(aes(x = factor(COG,levels = c("na",COG_categories[COG_categories != "na"])),
-#                  y = Sig.rat,
-#                  color = ColorGroup),
-#              size = 2)+
-#   scale_color_manual(values = c("unannotated" = "black",
-#                                 "Higher" = "red",
-#                                 "Lower" = "blue"))+
-#   facet_wrap(facets = "phase.peaks", nrow = 4,ncol = 3)+
-#   theme_classic()
+ggplot(dfOut2)+
+  geom_point(aes(x = factor(COG,levels = c("TotPhase","na",COG_categories[!(COG_categories %in% c("na","TotPhase"))])),
+                 y = Sig.rat*100,
+                 color = ColorGroup),
+             size = 4)+
+  scale_color_manual(values = c("unannotated" = "black",
+                                "Higher" = "red",
+                                "Lower" = "blue"))+
+  facet_wrap(facets = "phase.peaks", nrow = 4,ncol = 3)+
+  theme_classic()
 
 ggplot(dfOut2)+
   geom_bar(aes(x = factor(COG,levels = c("TotPhase","na",COG_categories[!(COG_categories %in% c("na","TotPhase"))])),
-               y = Sig.rat,
+               y = Sig.rat*100,
                fill = ColorGroup),
              position = "stack",stat = "identity")+
   scale_fill_manual(values = c("unannotated" = "black",
@@ -871,6 +872,82 @@ ggplot(dfOut2)+
   theme_classic()
   
 ```
+
+```{r}
+load("CSV_files/FullMerged_rain.RData",verbose = T)
+
+Full.merged_rain$phase.peaks <- paste(Full.merged_rain$phase,Full.merged_rain$peak.shape,sep = "+")
+phase.peaks <- factor(unique(Full.merged_rain$phase.peaks),
+                      levels = c("Morning+6","Morning+12","Morning+18",
+                                 "Afternoon+6","Afternoon+12","Afternoon+18",
+                                 "Evening+6","Evening+12","Evening+18",
+                                 "Night+6","Night+12","Night+18"))
+
+Full.merged_rain$K1_paths[is.na(Full.merged_rain$K1_paths)] <- "unannot"
+Full.merged_rain$K1_paths[Full.merged_rain$K1_paths == ""] <- "no_path"
+
+KEGG_paths <- sort(unique(Full.merged_rain$K1_paths))
+
+for(i in 1:length(phase.peaks)){
+  if(i == 1){
+    df.sig <- data.frame(matrix(NA,nrow = length(phase.peaks),ncol = length(KEGG_paths)))
+    df.insig <- data.frame(matrix(NA,nrow = length(phase.peaks),ncol = length(KEGG_paths)))
+    
+    names(df.sig) <- KEGG_paths
+    df.sig$phase.peaks <- phase.peaks
+    
+    names(df.insig) <- KEGG_paths
+    df.insig$phase.peaks <- phase.peaks
+  }
+  
+  filter <- Full.merged_rain$phase.peaks == phase.peaks[i]
+  df.temp <- Full.merged_rain[filter,]
+  
+  phase.rat <- sum(df.temp$Sig == "Sig")/nrow(df.temp)
+  
+  for(j in 1:length(KEGG_paths)){
+    vec1 <- sum(df.temp$K1_paths[df.temp$Sig == "Sig"] == KEGG_paths[j])
+    vec2 <- sum(df.temp$K1_paths[df.temp$Sig == "Insig"] == KEGG_paths[j])
+    
+    # df.sig[i,j] <- ifelse(vec1+vec2 == 0,0,vec1/(vec1+vec2))
+    # df.insig[i,j] <- ifelse(vec1+vec2 == 0,0,vec2/(vec1+vec2))
+    # df.sig[i,j] <- vec1
+    # df.insig[i,j] <- vec2
+    
+    df.sig[i,j] <- ifelse(vec1+vec2 == 0,0,ifelse(vec1+vec2 == 1,0,vec1/(vec1+vec2)))-phase.rat
+    df.insig[i,j] <- ifelse(vec1+vec2 == 0,0,ifelse(vec1+vec2 == 1,0,vec2/(vec1+vec2)))
+  }
+  
+  if(i == length(phase.peaks)){
+    df.sig$Total <- apply(df.sig[,KEGG_paths],1,sum)
+    df.insig$Total <- apply(df.insig[,KEGG_paths],1,sum)
+    
+    df.sig$Sig <- "Sig"
+    df.insig$Sig <- "Insig"
+    
+    dfOut <- rbind.data.frame(df.sig,df.insig)
+    
+    rm(list = c("df.sig","df.insig","df.temp"))
+  }
+}
+
+# dfOut$TotPhase <- apply(dfOut[,KEGG_paths],1,sum)
+# 
+# dfOut2 <- dfOut %>% pivot_longer(cols = all_of(c(KEGG_paths,"TotPhase")),
+#                                  names_to = "Paths",
+#                                  values_to = "Count")
+# 
+# dfOut2$TotPhase.KEGG <- rep(dfOut2$Count[dfOut2$Sig == "Insig"] + dfOut2$Count[dfOut2$Sig == "Sig"],2)
+# 
+# 
+# dfOut2 <- dfOut2[dfOut2$Sig == "Sig",]
+# dfOut2$Sig.rat <- dfOut2$Count/dfOut2$TotPhase.KEGG
+# 
+# dfOut2$Sig.rat[dfOut2$TotPhase.KEGG == 0] <- 0
+
+pheatmap(dfOut[1:12,KEGG_paths])
+```
+
 
 
 ```{r}
