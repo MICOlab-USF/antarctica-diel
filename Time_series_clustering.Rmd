@@ -904,6 +904,7 @@ for(i in 1:length(phase.peaks)){
   df.temp <- Full.merged_rain[filter,]
   
   phase.rat <- sum(df.temp$Sig == "Sig")/nrow(df.temp)
+  print(phase.rat)
   
   for(j in 1:length(KEGG_paths)){
     vec1 <- sum(df.temp$K1_paths[df.temp$Sig == "Sig"] == KEGG_paths[j])
@@ -911,11 +912,21 @@ for(i in 1:length(phase.peaks)){
     
     # df.sig[i,j] <- ifelse(vec1+vec2 == 0,0,vec1/(vec1+vec2))
     # df.insig[i,j] <- ifelse(vec1+vec2 == 0,0,vec2/(vec1+vec2))
+    
     # df.sig[i,j] <- vec1
     # df.insig[i,j] <- vec2
     
-    df.sig[i,j] <- ifelse(vec1+vec2 == 0,0,ifelse(vec1+vec2 == 1,0,vec1/(vec1+vec2)))-phase.rat
-    df.insig[i,j] <- ifelse(vec1+vec2 == 0,0,ifelse(vec1+vec2 == 1,0,vec2/(vec1+vec2)))
+    # df.sig[i,j] <- ifelse(vec1+vec2 > 1/phase.rat,(vec1/(vec1+vec2))-phase.rat,0)
+    
+    # Adding weight to the significance ratio, by adding a value to the divisor, 
+    # so that if a kegg path in that phase only has 1 observation, it will be equal 
+    # to the average for the total of that phase.
+    # Next step is to find top 10 paths for each phase.
+    df.sig[i,j] <- ifelse(vec1+vec2 > 0,(vec1/(vec1+vec2+(1/phase.rat))-phase.rat),0)
+    df.insig[i,j] <- vec2+vec1
+    
+    # df.sig[i,j] <- ifelse(vec1+vec2 == 0,0,ifelse(vec1+vec2 == 1,0,vec1/(vec1+vec2)))
+    # df.insig[i,j] <- ifelse(vec1+vec2 == 0,0,ifelse(vec1+vec2 == 1,0,vec2/(vec1+vec2)))
   }
   
   if(i == length(phase.peaks)){
@@ -925,27 +936,48 @@ for(i in 1:length(phase.peaks)){
     df.sig$Sig <- "Sig"
     df.insig$Sig <- "Insig"
     
-    dfOut <- rbind.data.frame(df.sig,df.insig)
-    
-    rm(list = c("df.sig","df.insig","df.temp"))
+    rm(list = c("df.temp"))
   }
 }
 
-# dfOut$TotPhase <- apply(dfOut[,KEGG_paths],1,sum)
-# 
-# dfOut2 <- dfOut %>% pivot_longer(cols = all_of(c(KEGG_paths,"TotPhase")),
-#                                  names_to = "Paths",
-#                                  values_to = "Count")
-# 
-# dfOut2$TotPhase.KEGG <- rep(dfOut2$Count[dfOut2$Sig == "Insig"] + dfOut2$Count[dfOut2$Sig == "Sig"],2)
-# 
-# 
-# dfOut2 <- dfOut2[dfOut2$Sig == "Sig",]
-# dfOut2$Sig.rat <- dfOut2$Count/dfOut2$TotPhase.KEGG
-# 
-# dfOut2$Sig.rat[dfOut2$TotPhase.KEGG == 0] <- 0
 
-pheatmap(dfOut[1:12,KEGG_paths])
+blues <- colorRampPalette(c("#91BFDB","#E0F3F8","#F7F7F7"))(8)
+reds <- colorRampPalette(c("#FFFFFF","#D6604D","#67001F"))(20)
+
+# blues <- colorRampPalette(c("#91BFDB","#E0F3F8","#F7F7F7"))(12)
+# reds <- colorRampPalette(c("#FFFFFF","#D6604D","#67001F"))(20)
+
+rownames(df.sig) <- df.sig$phase.peaks
+
+
+KEGG_paths[!(KEGG_paths %in% c("no_path","unannot"))]
+
+path_df <- data.frame("Paths" = KEGG_paths)
+row.names(path_df) <- KEGG_paths
+
+col_paths <- c(rep("white",317),"grey","black")
+names(col_paths) <- c(KEGG_paths[!(KEGG_paths %in% c("no_path","unannot"))],"no_path","unannot")
+col_paths <- list("Paths" = col_paths)
+
+heat_plot <- pheatmap(df.sig[,KEGG_paths],
+                      col = c(blues,reds),
+                      cluster_rows = T,cluster_cols = T,
+                      clustering_distance_cols = "euclidean",
+                      clustering_distance_rows = "euclidean",
+                      clustering_method = "ward.D",
+                      annotation_col = path_df,
+                      annotation_colors = col_paths,
+                      show_colnames = F,
+                      annotation_legend = F,
+                      fontsize = 15,
+                      annotation_names_col = F)
+
+# png("Chapter1_plots/KEGG_paths_enrichment.png",height = 1080, width = 1920)
+# heat_plot
+# dev.off()
+
+top10 <- sort(apply(df.sig[1:12,KEGG_paths],2,max),decreasing = T)[1:10]
+bottom10 <- sort(apply(df.sig[1:12,KEGG_paths],2,min),decreasing = F)[1:10]
 ```
 
 
