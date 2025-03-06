@@ -840,8 +840,8 @@ for(i in 1:length(phase.peaks)){
   filter <- dfOut2$phase.peaks == phase.peaks[i]
   df.temp <- dfOut2[filter,]
   
-  dfOut2$ColorGroup[filter] <- unlist(lapply(df.temp$Sig.rat,function(x){ifelse(x > df.temp$Sig.rat[df.temp$COG == "TotPhase"],
-                                                                              "Higher","Lower")}))
+  dfOut2$ColorGroup[filter] <- unlist(lapply(df.temp$Sig.rat,
+                                             function(x){ifelse(x > df.temp$Sig.rat[df.temp$COG == "TotPhase"],"Higher","Lower")}))
   
   if(i == length(phase.peaks)){
     dfOut2$ColorGroup[dfOut2$COG == "na"] <- "unannotated"
@@ -896,7 +896,73 @@ png("Chapter1_plots/COG_enrichment.png",height = 1080, width = 1920)
 heat_plot
 dev.off()
 
+
 ```
+
+```{r}
+load("CSV_files/FullMerged_rain.RData",verbose = T)
+
+Full.merged_rain$phase.peaks <- paste(Full.merged_rain$phase,Full.merged_rain$peak.shape,sep = "+")
+phase.peaks <- factor(unique(Full.merged_rain$phase.peaks),
+                      levels = c("Morning+6","Morning+12","Morning+18",
+                                 "Afternoon+6","Afternoon+12","Afternoon+18",
+                                 "Evening+6","Evening+12","Evening+18",
+                                 "Night+6","Night+12","Night+18"))
+
+COG_categories <- sort(unique(unlist(lapply(unique(Full.merged_rain$COG_category),
+                                            function(x){strsplit(x,split = "")}))))
+
+Full.merged_rain$COG_category[is.na(Full.merged_rain$COG_category)] <- "na"
+
+COG_categories <- c(COG_categories,"na")
+
+for(i in 1:length(phase.peaks)){
+  if(i == 1){
+    df.Fisher <- data.frame(matrix(NA,nrow = length(phase.peaks),ncol = length(COG_categories)))
+    
+    names(df.Fisher) <- COG_categories
+    row.names(df.Fisher) <- phase.peaks
+  }
+  
+  filter <- Full.merged_rain$phase.peaks == phase.peaks[i]
+  df.temp <- Full.merged_rain[filter,]
+  
+  for(j in 1:length(COG_categories)){
+    grep.Sig <- grep(COG_categories[j],df.temp$COG_category[df.temp$Sig == "Sig"])
+    
+    is.Sig.inGroup <- length(grep.Sig)
+    is.Sig.NotInGroup <- sum(df.temp$Sig == "Sig")-length(grep.Sig)
+    
+    grep.insig <- grep(COG_categories[j],df.temp$COG_category[df.temp$Sig == "Insig"])
+    
+    not.Sig.inGroup <- length(grep.insig)
+    not.Sig.NotInGroup <- sum(df.temp$Sig == "Insig")-length(grep.insig)
+    
+    d <- data.frame(is.Sig = c(is.Sig.inGroup,is.Sig.NotInGroup),
+                    not.Sig = c(not.Sig.inGroup,not.Sig.NotInGroup))
+    row.names(d) <- c("In.Group","NotIn.Group")
+    
+    df.Fisher[i,j] <- fisher.test(d,alternative = "t")$p.value
+  }
+}
+
+
+blues <- colorRampPalette(c("#91BFDB","#E0F3F8"))(95)
+reds <- colorRampPalette(c("#FFFFFF","#D6604D","#67001F"))(6)
+
+heat_plot <- pheatmap(df.Fisher,
+                      col = c(rev(reds[-1]),blues),
+                      cluster_rows = T,cluster_cols = T,
+                      clustering_distance_cols = "euclidean",
+                      clustering_distance_rows = "euclidean",
+                      clustering_method = "ward.D",
+                      show_colnames = T,
+                      annotation_legend = F,
+                      fontsize = 15)
+
+```
+
+
 
 ```{r}
 load("CSV_files/FullMerged_rain.RData",verbose = T)
@@ -941,14 +1007,16 @@ for(i in 1:length(phase.peaks)){
     # df.sig[i,j] <- vec1
     # df.insig[i,j] <- vec2
     
-    # df.sig[i,j] <- ifelse(vec1+vec2 > 1/phase.rat,(vec1/(vec1+vec2))-phase.rat,0)
+    df.sig[i,j] <- ifelse(vec1+vec2 > 1/phase.rat,(vec1/(vec1+vec2))-phase.rat,0)
     
     # Adding weight to the significance ratio, by adding a value to the divisor, 
     # so that if a kegg path in that phase only has 1 observation, it will be equal 
     # to the average for the total of that phase.
     # Next step is to find top 10 paths for each phase.
-    df.sig[i,j] <- ifelse(vec1+vec2 > 0,(vec1/(vec1+vec2+(1/phase.rat))-phase.rat),0)
+    # df.sig[i,j] <- ifelse(vec1+vec2 > 0,(vec1/(vec1+vec2+(1/phase.rat))-phase.rat),0)
     df.insig[i,j] <- vec2+vec1
+    
+    
     
     # df.sig[i,j] <- ifelse(vec1+vec2 == 0,0,ifelse(vec1+vec2 == 1,0,vec1/(vec1+vec2)))
     # df.insig[i,j] <- ifelse(vec1+vec2 == 0,0,ifelse(vec1+vec2 == 1,0,vec2/(vec1+vec2)))
@@ -970,9 +1038,6 @@ for(i in 1:length(phase.peaks)){
 
 rownames(df.sig) <- df.sig$phase.peaks
 
-
-KEGG_paths[!(KEGG_paths %in% c("no_path","unannot"))]
-
 path_df <- data.frame("Paths" = KEGG_paths)
 row.names(path_df) <- KEGG_paths
 
@@ -980,11 +1045,11 @@ col_paths <- c(rep("white",317),"grey","black")
 names(col_paths) <- c(KEGG_paths[!(KEGG_paths %in% c("no_path","unannot"))],"no_path","unannot")
 col_paths <- list("Paths" = col_paths)
 
-# blues <- colorRampPalette(c("#91BFDB","#E0F3F8","#F7F7F7"))(8)
-# reds <- colorRampPalette(c("#FFFFFF","#D6604D","#67001F"))(20)
+blues <- colorRampPalette(c("#91BFDB","#E0F3F8","#F7F7F7"))(8)
+reds <- colorRampPalette(c("#FFFFFF","#D6604D","#67001F"))(20)
 
-blues <- colorRampPalette(c("#91BFDB","#E0F3F8"))(4)
-reds <- colorRampPalette(c("#FFFFFF","#D6604D","#67001F"))(7)
+# blues <- colorRampPalette(c("#91BFDB","#E0F3F8"))(4)
+# reds <- colorRampPalette(c("#FFFFFF","#D6604D","#67001F"))(7)
 
 heat_plot <- pheatmap(df.sig[,KEGG_paths],
                       col = c(blues,reds),
@@ -1007,7 +1072,81 @@ top10 <- sort(apply(df.sig[1:12,KEGG_paths],2,max),decreasing = T)[1:10]
 bottom10 <- sort(apply(df.sig[1:12,KEGG_paths],2,min),decreasing = F)[1:10]
 ```
 
+```{r}
+load("CSV_files/FullMerged_rain.RData",verbose = T)
 
+Full.merged_rain$phase.peaks <- paste(Full.merged_rain$phase,Full.merged_rain$peak.shape,sep = "+")
+phase.peaks <- factor(unique(Full.merged_rain$phase.peaks),
+                      levels = c("Morning+6","Morning+12","Morning+18",
+                                 "Afternoon+6","Afternoon+12","Afternoon+18",
+                                 "Evening+6","Evening+12","Evening+18",
+                                 "Night+6","Night+12","Night+18"))
+
+Full.merged_rain$K1_paths[is.na(Full.merged_rain$K1_paths)] <- "unannot"
+Full.merged_rain$K1_paths[Full.merged_rain$K1_paths == ""] <- "no_path"
+
+KEGG_paths <- sort(unique(Full.merged_rain$K1_paths))
+
+for(i in 1:length(phase.peaks)){
+  if(i == 1){
+    df.Fisher <- data.frame(matrix(NA,nrow = length(phase.peaks),ncol = length(KEGG_paths)))
+    
+    names(df.Fisher) <- KEGG_paths
+    row.names(df.Fisher) <- phase.peaks
+  }
+  
+  filter <- Full.merged_rain$phase.peaks == phase.peaks[i]
+  df.temp <- Full.merged_rain[filter,]
+  
+  for(j in 1:length(KEGG_paths)){
+    is.Sig.inGroup <- sum(df.temp$K1_paths[df.temp$Sig == "Sig"] == KEGG_paths[j])
+    is.Sig.NotInGroup <- sum(df.temp$K1_paths[df.temp$Sig == "Sig"] != KEGG_paths[j])
+    not.Sig.inGroup <- sum(df.temp$K1_paths[df.temp$Sig == "Insig"] == KEGG_paths[j])
+    not.Sig.NotInGroup <- sum(df.temp$K1_paths[df.temp$Sig == "Insig"] != KEGG_paths[j])
+    
+    d <- data.frame(is.Sig = c(is.Sig.inGroup,is.Sig.NotInGroup),
+                    not.Sig = c(not.Sig.inGroup,not.Sig.NotInGroup))
+    row.names(d) <- c("In.Group","NotIn.Group")
+    
+    df.Fisher[i,j] <- fisher.test(d,alternative = "g")$p.value
+  }
+}
+
+path_df <- data.frame("Paths" = KEGG_paths)
+row.names(path_df) <- KEGG_paths
+
+col_paths <- c(rep("white",317),"grey","black")
+names(col_paths) <- c(KEGG_paths[!(KEGG_paths %in% c("no_path","unannot"))],"no_path","unannot")
+col_paths <- list("Paths" = col_paths)
+
+blues <- colorRampPalette(c("#91BFDB","#E0F3F8","white"))(95)
+reds <- colorRampPalette(c("#FFFFFF","#D6604D","#67001F"))(6)
+
+heat_plot <- pheatmap(df.Fisher,
+                      col = c(rev(reds[-1]),blues),
+                      cluster_rows = T,cluster_cols = T,
+                      clustering_distance_cols = "euclidean",
+                      clustering_distance_rows = "euclidean",
+                      clustering_method = "ward.D",
+                      annotation_col = path_df,
+                      annotation_colors = col_paths,
+                      show_colnames = T,
+                      annotation_legend = F,
+                      fontsize = 15)
+
+# for(i in 1:12){
+#   vec <- names(sort(unlist(df.Fisher[i,KEGG_paths]))[1:5])
+#   
+#   if(i == 1){
+#     top.vec <- vec
+#   }else{
+#     top.vec <- c(top.vec,vec[!(vec %in% top.vec)])
+#   }
+#   
+# }
+
+
+```
 
 ```{r}
 load("CSV_files/FullMerged_rain.RData",verbose = T)

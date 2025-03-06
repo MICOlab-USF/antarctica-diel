@@ -1,4 +1,4 @@
-pathway_API <- function(input,ReturnFull = 0){
+KEGG.get_API <- function(input,ReturnFull = 0){
   pathway <- system(paste0("curl https://rest.kegg.jp/get/", input), intern=TRUE)
   
   Name_idx <- grep("NAME",pathway)
