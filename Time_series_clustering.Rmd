@@ -870,7 +870,32 @@ ggplot(dfOut2)+
                                 "Lower" = "blue"))+
   facet_wrap(facets = "phase.peaks", nrow = 4,ncol = 3)+
   theme_classic()
+
+df.sig <- dfOut[1:12,c(COG_categories,"TotPhase")]
+df.insig <- dfOut[13:24,c(COG_categories,"TotPhase")]
+
+row.names(df.sig) <- dfOut$phase.peaks[1:12]
+row.names(df.insig) <- dfOut$phase.peaks[13:24]
+
+dfOut2 <- t(apply(df.sig/(df.insig+df.sig),1,function(x){x[COG_categories]-x["TotPhase"]}))
+
+blues <- colorRampPalette(c("#91BFDB","#E0F3F8"))(5)
+reds <- colorRampPalette(c("#FFFFFF","#D6604D","#67001F"))(8)
+
+heat_plot <- pheatmap(dfOut2,
+                      col = c(blues,reds),
+                      cluster_rows = T,cluster_cols = T,
+                      clustering_distance_cols = "euclidean",
+                      clustering_distance_rows = "euclidean",
+                      clustering_method = "ward.D",
+                      show_colnames = T,
+                      annotation_legend = F,
+                      fontsize = 15)
   
+png("Chapter1_plots/COG_enrichment.png",height = 1080, width = 1920)
+heat_plot
+dev.off()
+
 ```
 
 ```{r}
@@ -941,11 +966,7 @@ for(i in 1:length(phase.peaks)){
 }
 
 
-blues <- colorRampPalette(c("#91BFDB","#E0F3F8","#F7F7F7"))(8)
-reds <- colorRampPalette(c("#FFFFFF","#D6604D","#67001F"))(20)
 
-# blues <- colorRampPalette(c("#91BFDB","#E0F3F8","#F7F7F7"))(12)
-# reds <- colorRampPalette(c("#FFFFFF","#D6604D","#67001F"))(20)
 
 rownames(df.sig) <- df.sig$phase.peaks
 
@@ -958,6 +979,12 @@ row.names(path_df) <- KEGG_paths
 col_paths <- c(rep("white",317),"grey","black")
 names(col_paths) <- c(KEGG_paths[!(KEGG_paths %in% c("no_path","unannot"))],"no_path","unannot")
 col_paths <- list("Paths" = col_paths)
+
+# blues <- colorRampPalette(c("#91BFDB","#E0F3F8","#F7F7F7"))(8)
+# reds <- colorRampPalette(c("#FFFFFF","#D6604D","#67001F"))(20)
+
+blues <- colorRampPalette(c("#91BFDB","#E0F3F8"))(4)
+reds <- colorRampPalette(c("#FFFFFF","#D6604D","#67001F"))(7)
 
 heat_plot <- pheatmap(df.sig[,KEGG_paths],
                       col = c(blues,reds),
