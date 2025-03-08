@@ -918,9 +918,9 @@ COG_categories <- c(COG_categories,"na")
 
 for(i in 1:length(phase.peaks)){
   if(i == 1){
-    df.Fisher <- data.frame(matrix(NA,nrow = length(phase.peaks),ncol = length(COG_categories)))
+    df.Fisher <- cbind.data.frame(matrix(NA,nrow = length(phase.peaks),ncol = length(COG_categories)),phase.peaks)
     
-    names(df.Fisher) <- COG_categories
+    names(df.Fisher) <- c(COG_categories,"phase.peaks")
     row.names(df.Fisher) <- phase.peaks
   }
   
@@ -946,11 +946,17 @@ for(i in 1:length(phase.peaks)){
   }
 }
 
+dfOut <- pivot_longer(df.Fisher,cols = all_of(COG_categories),names_to = "COG",values_to = "P.value")
+
+q_val <- 0.05
+abh_metric <- 1:nrow(dfOut)*(q_val/nrow(dfOut))
+
+dfOut <- cbind.data.frame(dfOut[order(dfOut$P.value,decreasing = F),],abh_metric)
 
 blues <- colorRampPalette(c("#91BFDB","#E0F3F8"))(95)
 reds <- colorRampPalette(c("#FFFFFF","#D6604D","#67001F"))(6)
 
-heat_plot <- pheatmap(df.Fisher,
+heat_plot <- pheatmap(df.Fisher[,COG_categories],
                       col = c(rev(reds[-1]),blues),
                       cluster_rows = T,cluster_cols = T,
                       clustering_distance_cols = "euclidean",
@@ -1089,9 +1095,9 @@ KEGG_paths <- sort(unique(Full.merged_rain$K1_paths))
 
 for(i in 1:length(phase.peaks)){
   if(i == 1){
-    df.Fisher <- data.frame(matrix(NA,nrow = length(phase.peaks),ncol = length(KEGG_paths)))
+    df.Fisher <- cbind.data.frame(matrix(NA,nrow = length(phase.peaks),ncol = length(KEGG_paths)),phase.peaks)
     
-    names(df.Fisher) <- KEGG_paths
+    names(df.Fisher) <- c(KEGG_paths,"phase.peaks")
     row.names(df.Fisher) <- phase.peaks
   }
   
@@ -1122,7 +1128,7 @@ col_paths <- list("Paths" = col_paths)
 blues <- colorRampPalette(c("#91BFDB","#E0F3F8","white"))(95)
 reds <- colorRampPalette(c("#FFFFFF","#D6604D","#67001F"))(6)
 
-heat_plot <- pheatmap(df.Fisher,
+heat_plot <- pheatmap(df.Fisher[,KEGG_paths],
                       col = c(rev(reds[-1]),blues),
                       cluster_rows = T,cluster_cols = T,
                       clustering_distance_cols = "euclidean",
@@ -1133,6 +1139,13 @@ heat_plot <- pheatmap(df.Fisher,
                       show_colnames = T,
                       annotation_legend = F,
                       fontsize = 15)
+
+dfOut <- pivot_longer(df.Fisher,cols = all_of(KEGG_paths),names_to = "KEGG",values_to = "P.value")
+
+q_val <- 0.05
+abh_metric <- 1:nrow(dfOut)*(q_val/nrow(dfOut))
+
+dfOut <- cbind.data.frame(dfOut[order(dfOut$P.value,decreasing = F),],abh_metric)
 
 # for(i in 1:12){
 #   vec <- names(sort(unlist(df.Fisher[i,KEGG_paths]))[1:5])
@@ -1147,6 +1160,115 @@ heat_plot <- pheatmap(df.Fisher,
 
 
 ```
+
+
+```{r}
+load("CSV_files/FullMerged_rain.RData",verbose = T)
+load("CSV_files/kegg_allPaths.RData",verbose = T)
+
+filter <- !is.na(Full.merged_rain$KEGG_ko)
+
+pathway_correlator <- function(kegg.ko){
+  if(kegg.ko != "-"){
+    
+    kegg.vec <- unlist(strsplit(kegg.ko,split = ","))
+    
+    vec <- paste(unlist(lapply(kegg.vec,function(x){df.Paths$paths[df.Paths$ko == x]})),collapse = ",")
+    
+    return(vec)
+  }else{
+    return("-")
+  }
+}
+
+Full.merged_rain$K1_paths[filter] <- unlist(lapply(Full.merged_rain$KEGG_ko[filter],pathway_correlator))
+
+Full.merged_rain$phase.peaks <- paste(Full.merged_rain$phase,Full.merged_rain$peak.shape,sep = "+")
+phase.peaks <- factor(unique(Full.merged_rain$phase.peaks),
+                      levels = c("Morning+6","Morning+12","Morning+18",
+                                 "Afternoon+6","Afternoon+12","Afternoon+18",
+                                 "Evening+6","Evening+12","Evening+18",
+                                 "Night+6","Night+12","Night+18"))
+
+Full.merged_rain$K1_paths[is.na(Full.merged_rain$K1_paths)] <- "unannot"
+
+KEGG.paths <- c(unique(unlist(lapply(df.Paths$paths,function(x){unlist(strsplit(x,split = ";"))}))),"unannot")
+
+for(i in 1:length(phase.peaks)){
+  if(i == 1){
+    df.Fisher <- cbind.data.frame(matrix(NA,nrow = length(phase.peaks),ncol = length(KEGG_paths)),phase.peaks)
+    
+    names(df.Fisher) <- c(KEGG_paths,"phase.peaks")
+    row.names(df.Fisher) <- phase.peaks
+  }
+  
+  filter <- Full.merged_rain$phase.peaks == phase.peaks[i]
+  df.temp <- Full.merged_rain[filter,]
+  
+  for(j in 1:length(KEGG.paths)){
+    grep.Sig <- grep(KEGG.paths[j],df.temp$K1_paths[df.temp$Sig == "Sig"])
+    
+    is.Sig.inGroup <- length(grep.Sig)
+    is.Sig.NotInGroup <- sum(df.temp$Sig == "Sig")-length(grep.Sig)
+    
+    grep.insig <- grep(KEGG.paths[j],df.temp$K1_paths[df.temp$Sig == "Insig"])
+    
+    not.Sig.inGroup <- length(grep.insig)
+    not.Sig.NotInGroup <- sum(df.temp$Sig == "Insig")-length(grep.insig)
+    
+    d <- data.frame(is.Sig = c(is.Sig.inGroup,is.Sig.NotInGroup),
+                    not.Sig = c(not.Sig.inGroup,not.Sig.NotInGroup))
+    row.names(d) <- c("In.Group","NotIn.Group")
+    
+    df.Fisher[i,j] <- fisher.test(d,alternative = "t")$p.value
+  }
+}
+
+path_df <- data.frame("Paths" = KEGG_paths)
+row.names(path_df) <- KEGG_paths
+
+col_paths <- c(rep("white",length(KEGG_paths)-2),"grey","black")
+names(col_paths) <- c(KEGG_paths[!(KEGG_paths %in% c("-","unannot"))],"-","unannot")
+col_paths <- list("Paths" = col_paths)
+
+blues <- colorRampPalette(c("#91BFDB","#E0F3F8","white"))(95)
+reds <- colorRampPalette(c("#FFFFFF","#D6604D","#67001F"))(6)
+
+heat_plot <- pheatmap(df.Fisher[,KEGG_paths],
+                      col = c(rev(reds[-1]),blues),
+                      cluster_rows = T,cluster_cols = T,
+                      clustering_distance_cols = "euclidean",
+                      clustering_distance_rows = "euclidean",
+                      clustering_method = "ward.D",
+                      annotation_col = path_df,
+                      annotation_colors = col_paths,
+                      show_colnames = T,
+                      annotation_legend = F,
+                      fontsize = 15)
+
+dfOut <- pivot_longer(df.Fisher,cols = all_of(KEGG_paths),names_to = "KEGG",values_to = "P.value")
+
+q_val <- 0.05
+abh_metric <- 1:nrow(dfOut)*(q_val/nrow(dfOut))
+
+dfOut <- cbind.data.frame(dfOut[order(dfOut$P.value,decreasing = F),],abh_metric)
+
+sig.list <- unique(dfOut$KEGG[dfOut$P.value<dfOut$abh_metric])
+
+# for(i in 1:12){
+#   vec <- names(sort(unlist(df.Fisher[i,KEGG_paths]))[1:5])
+#   
+#   if(i == 1){
+#     top.vec <- vec
+#   }else{
+#     top.vec <- c(top.vec,vec[!(vec %in% top.vec)])
+#   }
+#   
+# }
+
+
+```
+
 
 ```{r}
 load("CSV_files/FullMerged_rain.RData",verbose = T)
