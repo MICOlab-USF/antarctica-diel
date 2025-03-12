@@ -1147,6 +1147,47 @@ abh_metric <- 1:nrow(dfOut)*(q_val/nrow(dfOut))
 
 dfOut <- cbind.data.frame(dfOut[order(dfOut$P.value,decreasing = F),],abh_metric)
 
+sig.list <- dfOut[dfOut$P.value<dfOut$abh_metric,]
+
+for(i in 1:length(unique(sig.list$phase.peaks))){
+  if(i == 1){
+    df.siglist <- data.frame(matrix(NA,
+                                    ncol = length(unique(sig.list$phase.peaks)),
+                                    nrow = length(unique(sig.list$KEGG))))
+    
+    names(df.siglist) <- unique(sig.list$phase.peaks)
+    row.names(df.siglist) <- unique(sig.list$KEGG)
+  }
+  
+  df.temp <- sig.list[sig.list$phase.peaks == unique(sig.list$phase.peaks)[i],]
+  
+  for(j in 1:length(unique(sig.list$KEGG))){
+    
+    df.siglist[j,i] <- ifelse(any(df.temp$KEGG == unique(sig.list$KEGG)[j]),1,0)
+    
+  }
+}
+
+source("pathway_API.R")
+
+vec <- unlist(lapply(row.names(df.siglist),function(x){ifelse(x %in% c("no_path","unannot"),x,pathway_API(x)$name)}))
+
+row.names(df.siglist) <- vec
+
+heat_plot <- pheatmap(df.siglist,
+                      col = c("darkred","darkblue"),
+                      cluster_rows = T,cluster_cols = T,
+                      clustering_distance_cols = "euclidean",
+                      clustering_distance_rows = "euclidean",
+                      clustering_method = "ward.D",
+                      show_colnames = T,
+                      annotation_legend = F,
+                      fontsize = 15)
+
+# png("Chapter1_plots/K1_pathsSigEnrichment.png",height = 1000, width = 800)
+# heat_plot
+# dev.off()
+
 # for(i in 1:12){
 #   vec <- names(sort(unlist(df.Fisher[i,KEGG_paths]))[1:5])
 #   
@@ -1192,7 +1233,7 @@ phase.peaks <- factor(unique(Full.merged_rain$phase.peaks),
 
 Full.merged_rain$K1_paths[is.na(Full.merged_rain$K1_paths)] <- "unannot"
 
-KEGG.paths <- c(unique(unlist(lapply(df.Paths$paths,function(x){unlist(strsplit(x,split = ";"))}))),"unannot")
+KEGG_paths <- c(unique(unlist(lapply(df.Paths$paths,function(x){unlist(strsplit(x,split = ";"))}))),"unannot")
 
 for(i in 1:length(phase.peaks)){
   if(i == 1){
@@ -1253,7 +1294,42 @@ abh_metric <- 1:nrow(dfOut)*(q_val/nrow(dfOut))
 
 dfOut <- cbind.data.frame(dfOut[order(dfOut$P.value,decreasing = F),],abh_metric)
 
-sig.list <- unique(dfOut$KEGG[dfOut$P.value<dfOut$abh_metric])
+sig.list <- dfOut[dfOut$P.value<dfOut$abh_metric,]
+
+for(i in 1:length(unique(sig.list$phase.peaks))){
+  if(i == 1){
+    df.siglist <- data.frame(matrix(NA,
+                                    ncol = length(unique(sig.list$phase.peaks)),
+                                    nrow = length(unique(sig.list$KEGG))))
+    
+    names(df.siglist) <- unique(sig.list$phase.peaks)
+    row.names(df.siglist) <- unique(sig.list$KEGG)
+  }
+  
+  df.temp <- sig.list[sig.list$phase.peaks == unique(sig.list$phase.peaks)[i],]
+  
+  for(j in 1:length(unique(sig.list$KEGG))){
+    
+    df.siglist[j,i] <- ifelse(any(df.temp$KEGG == unique(sig.list$KEGG)[j]),1,0)
+    
+  }
+}
+
+# source("pathway_API.R")
+# 
+# vec <- unlist(lapply(row.names(df.siglist),function(x){ifelse(x %in% c("no_path","unannot"),x,pathway_API(x)$name)}))
+# 
+# row.names(df.siglist) <- vec
+
+heat_plot <- pheatmap(df.siglist,
+                      col = c("darkred","darkblue"),
+                      cluster_rows = T,cluster_cols = T,
+                      clustering_distance_cols = "euclidean",
+                      clustering_distance_rows = "euclidean",
+                      clustering_method = "ward.D",
+                      show_colnames = T,
+                      annotation_legend = F,
+                      fontsize = 15)
 
 # for(i in 1:12){
 #   vec <- names(sort(unlist(df.Fisher[i,KEGG_paths]))[1:5])
