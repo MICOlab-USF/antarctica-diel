@@ -57,12 +57,15 @@ green <- c("#16866F","#1E3F1C","#99A339","#516A65","#8BC89F","darkgreen")
 blue <- c("#005694","#B7E1DD","#66879E","#1BAAE2","#5FC8D8","darkblue")
 purple <- c("#E7D7CE","#A699A9","#434582","#81347D", "#B5218E")
 
+Euk.color <- c("#8BC89F","#5FC8D8",'#C14450')
+Bact.color <- c("#F7F4B7", "#CC9C3C")
+
 colors30 <- c(blue, purple, red, yellow, orange, green, "black")
 
-plot.width <- 10
-plot.height <- 6
+plot.width <- 10/1.5
+plot.height <- 6/1.5
 
-save_plots <- TRUE
+save_plots <- F
 ```
 
 ## Distribution plots:
@@ -147,8 +150,11 @@ ggplot(dfOut)+
   labs(x = "Taxonomic level",
        y = "% of normalized reads",
        title = "Annotated contigs to specific taxonomical level",
-       caption = "The dots indicate the percentage of contigs that are\n annotated at that level, plotted on the seconday y-axis",)+
-  theme_classic()
+       caption = "The dots indicate the percentage of contigs that are\n annotated at that level, plotted on the seconday y-axis",
+       fill = "Annotated",
+       color = "")+
+  theme_classic()+
+  theme(axis.text.x = element_text(angle = 45,vjust = 0.5))
 
 if(save_plots){
   ggsave("Chapter1_plots/TPM_annotatedTaxBar.png",dpi = 300,height = plot.height,width = plot.width)
@@ -205,6 +211,10 @@ meta.data$Replicate <- unlist(lapply(meta.data$SampleName,function(x){substr(x,s
 dfOut <- pivot_longer(df.count,cols = all_of(day.vec),names_to = "SampleID",values_to = "TPM")
 dfOut <- merge(dfOut,meta.data[,c("SampleID","SampleName","AssemblyGroup","Day.num","ToD","Replicate")],by = "SampleID")
 
+df.TopDiv <- cbind.data.frame("Domain" = Full.merged$Domain[Full.merged$Division %in% top.Div],
+                              "Division" = Full.merged$Division[Full.merged$Division %in% top.Div]) %>% 
+  distinct(Division, .keep_all = T)
+
 for(i in 1:length(top.Div)){
   if(i == 1){
     vec <- rep(NA,length(top.Div))
@@ -231,6 +241,8 @@ for(i in 1:length(top.Div)){
     names(div.colors) <- c(top.Div,"other")
   }
 }
+
+
 
 order.vec1 <- c("Day1_afternoon","Day1_evening","Day1_night","Day1_morning",
                "Day2_night","Day2_morning","Day2_afternoon","Day2_evening")
@@ -261,10 +273,11 @@ ggplot(dfOut) +
        title = "Top Division represented",
        fill = "Division")+
   scale_fill_manual(values = div.colors)+
-  theme(axis.text.x = element_blank())
+  theme(axis.text.x = element_blank())+
+  guides(fill = guide_legend(ncol=2))
 
 if(save_plots){
-  ggsave("Chapter1_plots/TPM_DivisionBars.png",dpi = 300,height = plot.height,width = plot.width)
+  ggsave("Chapter1_plots/TPM_DivisionBars.png",dpi = 300,height = plot.height,width = plot.width*1.5)
 }
 ```
 
@@ -371,10 +384,11 @@ ggplot(dfOut) +
        title = "Top Classes represented",
        fill = "Class")+
   scale_fill_manual(values = div.colors)+
-  theme(axis.text.x = element_blank())
+  theme(axis.text.x = element_blank())+
+  guides(fill = guide_legend(ncol=2))
 
 if(save_plots){
-  ggsave("Chapter1_plots/TPM_ClassBars.png",dpi = 300,height = plot.height,width = plot.width)
+  ggsave("Chapter1_plots/TPM_ClassBars.png",dpi = 300,height = plot.height,width = plot.width*1.5)
 }
 ```
 
@@ -488,10 +502,11 @@ ggplot(dfOut) +
        title = "Top Genus represented",
        fill = "Genus")+
   scale_fill_manual(values = div.colors)+
-  theme(axis.text.x = element_blank())
+  theme(axis.text.x = element_blank())+
+  guides(fill = guide_legend(ncol=2))
 
 if(save_plots){
-  ggsave("Chapter1_plots/TPM_GenusBars.png",dpi = 300,height = plot.height,width = plot.width)
+  ggsave("Chapter1_plots/TPM_GenusBars.png",dpi = 300,height = plot.height,width = plot.width*1.5)
 }
 ```
 
@@ -607,10 +622,11 @@ ggplot(dfOut) +
        title = "Top Species represented",
        fill = "Species")+
   scale_fill_manual(values = div.colors)+
-  theme(axis.text.x = element_blank())
+  theme(axis.text.x = element_blank())+
+  guides(fill = guide_legend(ncol=2))
 
 if(save_plots){
-  ggsave("Chapter1_plots/TPM_SpeciesBars.png",dpi = 300,height = plot.height,width = plot.width)
+  ggsave("Chapter1_plots/TPM_SpeciesBars.png",dpi = 300,height = plot.height,width = plot.width*1.5)
 }
 ```
 
