@@ -1233,7 +1233,7 @@ phase.peaks <- factor(unique(Full.merged_rain$phase.peaks),
 
 Full.merged_rain$K1_paths[is.na(Full.merged_rain$K1_paths)] <- "unannot"
 
-KEGG_paths <- c(unique(unlist(lapply(df.Paths$paths,function(x){unlist(strsplit(x,split = ";"))}))),"unannot")
+KEGG.paths <- c(unique(unlist(lapply(df.Paths$paths,function(x){unlist(strsplit(x,split = ";"))}))),"unannot")
 
 for(i in 1:length(phase.peaks)){
   if(i == 1){
