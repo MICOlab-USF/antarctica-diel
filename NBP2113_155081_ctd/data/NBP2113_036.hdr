@@ -1,0 +1,29 @@
+* Sea-Bird SBE 9 Data File:
+* FileName = D:\Data\raw\NBP2113_036.hdr
+* Software Version Seasave V 7.26.7.121
+* Temperature SN = 2438
+* Conductivity SN = 2067
+* Number of Bytes Per Scan = 40
+* Number of Voltage Words = 5
+* Number of Scans Averaged by the Deck Unit = 1
+* System UpLoad Time = Dec 09 2021 08:52:45
+* NMEA Latitude = 64 56.01 S
+* NMEA Longitude = 064 24.02 W
+* NMEA UTC (Time) = Dec 09 2021  08:52:43
+* Store Lat/Lon Data = Append to Every Scan
+* SBE 11plus V 5.1g
+* number of scans to average = 1
+* pressure baud rate = 9600
+* NMEA baud rate = 9600
+* surface PAR voltage added to scan
+* A/D offset = 8
+* Latitude/Longitude added to scan
+* GPIB address = 1
+* autorun on power up is disabled
+* S>
+** Ship: RVIB N.B. Palmer 
+** Cruise: NBP2113 LTER 
+** Station: 600.040
+** Operator: B. Urmston
+* System UTC = Dec 09 2021 08:52:45
+*END*
