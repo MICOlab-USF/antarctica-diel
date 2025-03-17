@@ -946,12 +946,6 @@ for(i in 1:length(phase.peaks)){
   }
 }
 
-dfOut <- pivot_longer(df.Fisher,cols = all_of(COG_categories),names_to = "COG",values_to = "P.value")
-
-q_val <- 0.05
-abh_metric <- 1:nrow(dfOut)*(q_val/nrow(dfOut))
-
-dfOut <- cbind.data.frame(dfOut[order(dfOut$P.value,decreasing = F),],abh_metric)
 
 blues <- colorRampPalette(c("#91BFDB","#E0F3F8"))(95)
 reds <- colorRampPalette(c("#FFFFFF","#D6604D","#67001F"))(6)
@@ -965,6 +959,48 @@ heat_plot <- pheatmap(df.Fisher[,COG_categories],
                       show_colnames = T,
                       annotation_legend = F,
                       fontsize = 15)
+
+dfOut <- pivot_longer(df.Fisher,cols = all_of(COG_categories),names_to = "COG",values_to = "P.value")
+
+q_val <- 0.05
+abh_metric <- 1:nrow(dfOut)*(q_val/nrow(dfOut))
+
+dfOut <- cbind.data.frame(dfOut[order(dfOut$P.value,decreasing = F),],abh_metric)
+
+sig.list <- dfOut[dfOut$P.value<dfOut$abh_metric,]
+
+for(i in 1:length(unique(sig.list$phase.peaks))){
+  if(i == 1){
+    df.siglist <- data.frame(matrix(NA,
+                                    ncol = length(unique(sig.list$phase.peaks)),
+                                    nrow = length(unique(sig.list$COG))))
+    
+    names(df.siglist) <- unique(sig.list$phase.peaks)
+    row.names(df.siglist) <- unique(sig.list$COG)
+  }
+  
+  df.temp <- sig.list[sig.list$phase.peaks == unique(sig.list$phase.peaks)[i],]
+  
+  for(j in 1:length(unique(sig.list$COG))){
+    
+    df.siglist[j,i] <- ifelse(any(df.temp$COG == unique(sig.list$COG)[j]),1,0)
+    
+  }
+}
+
+heat_plot <- pheatmap(t(df.siglist),
+                      col = c("darkred","darkblue"),
+                      cluster_rows = T,cluster_cols = T,
+                      clustering_distance_cols = "euclidean",
+                      clustering_distance_rows = "euclidean",
+                      clustering_method = "ward.D",
+                      show_colnames = T,
+                      annotation_legend = F,
+                      fontsize = 15)
+
+# png("Chapter1_plots/COG_Sig_enrichment1.png",height = 1000, width = 800)
+# heat_plot
+# dev.off()
 
 ```
 
