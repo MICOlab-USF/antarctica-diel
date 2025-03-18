@@ -1396,10 +1396,11 @@ phase.peaks <- factor(unique(Full.merged_rain$phase.peaks),
 filter <- is.na(Full.merged_rain$KEGG_ko)
 Full.merged_rain$KEGG_ko[filter] <- "unannot"
 
-KEGG.vec <- c(df.Paths$ko[1:100],"unannot")
+KEGG.vec <- c(df.Paths$ko,"unannot")
 
 for(i in 1:length(phase.peaks)){
   if(i == 1){
+    Time1 <- Sys.time()
     df.Fisher <- cbind.data.frame(matrix(NA,nrow = length(phase.peaks),ncol = length(KEGG.vec)),phase.peaks)
     
     names(df.Fisher) <- c(KEGG.vec,"phase.peaks")
@@ -1426,6 +1427,7 @@ for(i in 1:length(phase.peaks)){
     
     df.Fisher[i,j] <- fisher.test(d,alternative = "t")$p.value
   }
+  print(paste(phase.peaks[i],"Finished.",round(difftime(Sys.time(),Time1,units = "hours"),2),"hours elapsed"))
 }
 
 path_df <- data.frame("Paths" = KEGG.vec)
