@@ -1440,17 +1440,17 @@ col_paths <- list("Paths" = col_paths)
 blues <- colorRampPalette(c("#91BFDB","#E0F3F8","white"))(95)
 reds <- colorRampPalette(c("#FFFFFF","#D6604D","#67001F"))(6)
 
-# heat_plot <- pheatmap(df.Fisher[,KEGG.vec],
-#                       col = c(rev(reds[-1]),blues),
-#                       cluster_rows = T,cluster_cols = T,
-#                       clustering_distance_cols = "euclidean",
-#                       clustering_distance_rows = "euclidean",
-#                       clustering_method = "ward.D",
-#                       annotation_col = path_df,
-#                       annotation_colors = col_paths,
-#                       show_colnames = T,
-#                       annotation_legend = F,
-#                       fontsize = 15)
+heat_plot <- pheatmap(df.Fisher[,KEGG.vec],
+                      col = c(rev(reds[-1]),blues),
+                      cluster_rows = T,cluster_cols = T,
+                      clustering_distance_cols = "euclidean",
+                      clustering_distance_rows = "euclidean",
+                      clustering_method = "ward.D",
+                      annotation_col = path_df,
+                      annotation_colors = col_paths,
+                      show_colnames = T,
+                      annotation_legend = F,
+                      fontsize = 15)
 
 dfOut <- pivot_longer(df.Fisher,cols = all_of(KEGG.vec),names_to = "KEGG",values_to = "P.value")
 
@@ -1458,6 +1458,13 @@ q_val <- 0.05
 abh_metric <- 1:nrow(dfOut)*(q_val/nrow(dfOut))
 
 dfOut <- cbind.data.frame(dfOut[order(dfOut$P.value,decreasing = F),],abh_metric)
+
+# abh_metric <- 1:length(KEGG.vec)*(q_val/length(KEGG.vec))
+# dfOut <- dfOut[order(dfOut$P.value,decreasing = F),]
+# 
+# for(i in 1:length(phase.peaks)){
+#   dfOut$abh_metric[dfOut$phase.peaks == phase.peaks[i]] <- abh_metric
+# }
 
 sig.list <- dfOut[dfOut$P.value<dfOut$abh_metric,]
 
@@ -1480,22 +1487,26 @@ for(i in 1:length(unique(sig.list$phase.peaks))){
   }
 }
 
-# source("pathway_API.R")
-# 
-# vec <- unlist(lapply(row.names(df.siglist),
-#                      function(x){ifelse(x %in% c("-","unannot"),x,pathway_API(x)$name)}))
-# 
-# row.names(df.siglist) <- vec
-# 
-# heat_plot <- pheatmap(df.siglist,
-#                       col = c("darkred","darkblue"),
-#                       cluster_rows = T,cluster_cols = T,
-#                       clustering_distance_cols = "euclidean",
-#                       clustering_distance_rows = "euclidean",
-#                       clustering_method = "ward.D",
-#                       show_colnames = T,
-#                       annotation_legend = F,
-#                       fontsize = 15)
+source("pathway_API.R")
+
+vec <- unlist(lapply(row.names(df.siglist),
+                     function(x){ifelse(x %in% c("-","unannot"),x,pathway_API(x)$name)}))
+
+row.names(df.siglist) <- vec
+
+heat_plot <- pheatmap(df.siglist,
+                      col = c("darkred","darkblue"),
+                      cluster_rows = T,cluster_cols = T,
+                      clustering_distance_cols = "euclidean",
+                      clustering_distance_rows = "euclidean",
+                      clustering_method = "ward.D",
+                      show_colnames = T,
+                      annotation_legend = F,
+                      fontsize = 15)
+
+# png("Chapter1_plots/KEGG_koSigEnrichment.png",height = 1500, width = 1400)
+# heat_plot
+# dev.off()
 
 # for(i in 1:12){
 #   vec <- names(sort(unlist(df.Fisher[i,KEGG.vec]))[1:5])
