@@ -13,6 +13,9 @@ nbp.loc <- vec[nbp.idx]
 
 library(oce)
 
+folder_vec <- "NBP2113_155081_ctd/data/"
+folder_list <- dnbp.loc
+
 nbp1 <- read.ctd(paste(folder_vec,nbp.loc[3],sep = ""))
 
 summary(nbp1)
@@ -20,9 +23,6 @@ summary(nbp1)
 plot(nbp1)
 
 plot(nbp1@data$fluorescence,-nbp1@data$depth)
-
-folder_vec <- "NBP2113_155081_ctd/data/"
-folder_list <- dnbp.loc
 
 for(i in 1:length(folder_list)){
   if(i == 1){

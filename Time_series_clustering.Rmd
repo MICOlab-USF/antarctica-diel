@@ -54,7 +54,6 @@ TPM <- TRUE
 
 
 ```{r, Data setup}
-TPM <- TRUE
 
 if(TPM == TRUE){
   load("CSV_files/Subsections.RData",verbose = TRUE)
