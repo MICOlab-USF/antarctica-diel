@@ -2308,3 +2308,109 @@ for(i in 1:length(vec2)){
 
 ```
 
+```{r}
+load("CSV_files/Full.merged.RData")
+source("pathway_API.R")
+
+met_module <-  paste("ko:",pathway_API("M00017")$definition,sep = "")
+Cobal_module <-  paste("ko:",pathway_API("M00122")$definition,sep = "")
+
+idx.vec <- unique(unlist(lapply(c(Cobal_module,met_module),function(x){unlist(grep(x,Full.merged$KEGG_ko))})))
+
+df.merged <- Full.merged[idx.vec,]
+
+kegg.vec <- c(met_module,Cobal_module)
+
+n <- length(kegg.vec)
+
+# df.merged <- df.merged[df.merged$K1_path != "Unclassified",]
+
+day.vec <- paste(meta.data$SampleID,"_quant",sep = "")
+m <- length(day.vec)
+
+for(i in 1:n){ #Looping through the Classes to count the occurrences.
+  
+  kegg.filter <- grepl(kegg.vec[i],df.merged$KEGG_ko)
+  df.temp <- df.merged[kegg.filter,]
+  
+  for(j in 1:m){ #Looping through the sampling time points.
+    
+   if(i == 1 & j == 1){ #Sets up an empty data.frame to input the data
+     
+     df.count <- data.frame(matrix(ncol = m, nrow = n))
+     names(df.count) <- meta.data$SampleName
+     
+     df.count <- cbind.data.frame(df.count,kegg.vec)
+   }
+    
+    # df.count[i,j] <- sum(df.temp[,day.vec[j]])/sum(df.merged[,day.vec[j]])
+    df.count[i,j] <- sum(df.temp[,day.vec[j]])
+    
+  }
+}
+
+dfOut <- pivot_longer(df.count,
+                      all_of(meta.data$SampleName),
+                      names_to = "Day",
+                      values_to = "Count") %>% 
+  mutate(Count = as.numeric(Count))
+
+dfOut$Day <- substring(dfOut$Day,1,nchar(dfOut$Day)-1)
+
+df.summ <- summarySE(data = dfOut, "Count",
+                     groupvars = c("Day","kegg.vec"))
+
+Day.Time <- meta.data[,c("AssemblyGroup","datetime")] %>% 
+  distinct(AssemblyGroup, .keep_all = TRUE)
+
+names(Day.Time)[names(Day.Time) == "AssemblyGroup"] <- "Day"
+
+dfOut2 <- merge(df.summ,Day.Time,by = "Day")
+
+dfOut2$Col_group <- NA
+dfOut2$Col_group[dfOut2$kegg.vec %in% met_module] <- "Met"
+dfOut2$Col_group[dfOut2$kegg.vec %in% Cobal_module] <- "Cobal"
+
+order.vec <- c("Day1_afternoon",
+               "Day1_evening",
+               "Day1_night",
+               "Day1_morning",
+               "Day2_night",
+               "Day2_morning",
+               "Day2_afternoon",
+               "Day2_evening")
+
+colors=c('#e9e9e9','#C14450','#f0b08f','#c2aba6','#60555f','#3c6481','#9fd6e6','#256F64','#63a375')
+
+red<- c("#EB8B8E","#FBD5E2","#E7B6AF","#AC6873", "#D82354")
+orange <- c("#FAAA6D","#FECF92")
+yellow <- c("#FFC317","#F7F4B7", "#CC9C3C")
+green <- c("#16866F","#1E3F1C","#99A339","#516A65","#8BC89F")
+blue <- c("#005694","#B7E1DD","#66879E","#1BAAE2","#5FC8D8","darkblue")
+purple <- c("#E7D7CE","#A699A9","#434582","#81347D", "#B5218E","darkblue")
+
+colors30 <- c(blue, purple, red, yellow, orange, green, "black")
+
+met_col <- c(red,yellow,green)
+cobal_col <- c("blue","red","green","yellow","grey","black")
+
+names(met_col) <- met_module
+names(cobal_col) <- Cobal_module
+
+ggplot(dfOut2)+
+  geom_point(aes(x = factor(Day,levels = order.vec),
+                 y = Count,
+                 colour = kegg.vec,
+                 group = kegg.vec),
+             size = 3)+
+  geom_line(aes(x = factor(Day,levels = order.vec),
+                 y = Count,
+                 colour = kegg.vec,
+                 group = kegg.vec),
+            linewidth = 1)+
+  facet_wrap(Col_group~.,
+             scale = "free_y")+
+  scale_colour_manual(values = c(met_col,cobal_col))+
+  theme_classic()
+```
+
