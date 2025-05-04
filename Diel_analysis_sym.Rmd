@@ -2414,3 +2414,22 @@ ggplot(dfOut2)+
   theme_classic()
 ```
 
+```{r}
+load("CSV_files/Full.merged.RData")
+source("pathway_API.R")
+
+met_module <-  paste("ko:",pathway_API("M00017")$definition,sep = "")
+Cobal_module <-  paste("ko:",pathway_API("M00122")$definition,sep = "")
+
+idx.vec <- unique(unlist(lapply(c(Cobal_module,met_module),function(x){unlist(grep(x,Full.merged$KEGG_ko))})))
+
+df.merged <- Full.merged[idx.vec,]
+```
+
+
+```{r}
+
+load("CSV_files/PairWise_DE.RData",verbose = T)
+
+```
+
